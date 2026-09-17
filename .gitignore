@@ -1,0 +1,15 @@
+# Environnement & Clés secrètes (CRITIQUE : JAMAIS DANS GIT)
+.env
+.env.local
+
+# Dépendances
+node_modules/
+
+# Builds
+dist/
+build/
+.next/
+
+# Logs & Système
+*.log
+.DS_Store
