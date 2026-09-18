@@ -1,0 +1,26 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Backend API et Agents pour Kenza",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "db:init": "tsx src/db/schema.ts",
+    "db:seed": "tsx src/db/seed.ts"
+  },
+  "dependencies": {
+    "@langchain/core": "^1.2.11",
+    "@langchain/langgraph": "^1.4.15",
+    "@langchain/openai": "^1.5.13",
+    "csv-parse": "^5.6.0",
+    "dotenv": "^16.4.7",
+    "pg": "^8.13.3",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "@types/pg": "^8.11.11",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}
