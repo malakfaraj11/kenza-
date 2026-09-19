@@ -150,7 +150,14 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     return reply.status(200).send({ status: 'ignored' });
   }
 
-  const remoteJid = body.data.key?.participant || body.data.key?.remoteJid;
+  // Extraire le numéro réel de l'expéditeur (préférer body.sender s'il contient @s.whatsapp.net pour éviter les identifiants @lid)
+  let remoteJid = body.data?.key?.participant || body.data?.key?.remoteJid;
+  if (body.sender && body.sender.includes('@s.whatsapp.net')) {
+    remoteJid = body.sender;
+  } else if (remoteJid?.includes('@lid') && body.sender) {
+    remoteJid = body.sender;
+  }
+
   if (!remoteJid) {
     return reply.status(200).send({ status: 'ignored' });
   }
