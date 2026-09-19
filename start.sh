@@ -11,7 +11,7 @@ echo "📦 1. Démarrage des conteneurs Docker (Postgres, Redis, Evolution API).
 docker compose up -d
 docker start evolution-api
 
-# Patch automatique de compatibilité WhatsApp LID pour Evolution API
+# Patch automatique de compatibilité WhatsApp LID et multi-devices pour Evolution API
 docker exec evolution-api node -e '
 const fs = require("fs");
 const file = "/evolution/dist/src/api/services/channels/whatsapp.baileys.service.js";
@@ -20,6 +20,18 @@ if (fs.existsSync(file)) {
   if (!content.includes("!isWA.jid.includes(\x27@lid\x27)")) {
     content = content.replace("!isWA.jid.includes(\x27@broadcast\x27)", "!isWA.jid.includes(\x27@broadcast\x27) && !isWA.jid.includes(\x27@lid\x27)");
     fs.writeFileSync(file, content);
+  }
+}
+const baileysSend = "/evolution/node_modules/baileys/lib/Socket/messages-send.js";
+if (fs.existsSync(baileysSend)) {
+  let bContent = fs.readFileSync(baileysSend, "utf8");
+  if (!bContent.includes("failed to encrypt for device, skipping")) {
+    const target = "const { type, ciphertext } = await signalRepository\n                .encryptMessage({ jid, data: bytes });\n            if (type === \x27pkmsg\x27) {\n                shouldIncludeDeviceIdentity = true;\n            }\n            const node = {\n                tag: \x27to\x27,\n                attrs: { jid },\n                content: [{\n                        tag: \x27enc\x27,\n                        attrs: {\n                            v: \x272\x27,\n                            type,\n                            ...extraAttrs || {}\n                        },\n                        content: ciphertext\n                    }]\n            };\n            return node;";
+    const repl = "try {\n                const { type, ciphertext } = await signalRepository\n                    .encryptMessage({ jid, data: bytes });\n                if (type === \x27pkmsg\x27) {\n                    shouldIncludeDeviceIdentity = true;\n                }\n                return {\n                    tag: \x27to\x27,\n                    attrs: { jid },\n                    content: [{\n                            tag: \x27enc\x27,\n                            attrs: {\n                                v: \x272\x27,\n                                type,\n                                ...extraAttrs || {}\n                            },\n                            content: ciphertext\n                        }]\n                };\n            } catch (err) {\n                logger.warn({ jid, err: err.message }, \x27failed to encrypt for device, skipping\x27);\n                return null;\n            }";
+    if (bContent.includes(target)) {
+      bContent = bContent.replace(target, repl).replace("return { nodes, shouldIncludeDeviceIdentity };", "return { nodes: nodes.filter(Boolean), shouldIncludeDeviceIdentity };");
+      fs.writeFileSync(baileysSend, bContent);
+    }
   }
 }
 ' >/dev/null 2>&1 || true

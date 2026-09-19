@@ -150,13 +150,9 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     return reply.status(200).send({ status: 'ignored' });
   }
 
-  // Extraire le numéro réel de l'expéditeur (préférer body.sender s'il contient @s.whatsapp.net pour éviter les identifiants @lid)
-  let remoteJid = body.data?.key?.participant || body.data?.key?.remoteJid;
-  if (body.sender && body.sender.includes('@s.whatsapp.net')) {
-    remoteJid = body.sender;
-  } else if (remoteJid?.includes('@lid') && body.sender) {
-    remoteJid = body.sender;
-  }
+  // L'expéditeur réel du message est toujours dans data.key.remoteJid (ou participant)
+  // Attention: body.sender représente le numéro du bot (l'instance connectée), NE PAS l'utiliser comme destinataire !
+  const remoteJid = body.data?.key?.participant || body.data?.key?.remoteJid;
 
   if (!remoteJid) {
     return reply.status(200).send({ status: 'ignored' });
@@ -195,9 +191,8 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'kenza-bot';
 
     if (apiUrl && apiKey && instanceName) {
-      const cleanTargetPhone = remoteJid.replace(/@.*$/, '').replace(/[^0-9]/g, '');
       const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
-      console.log(`📤 [WhatsApp Envoi] Envoi de la réponse à ${cleanTargetPhone} (${remoteJid}): "${messageText}"`);
+      console.log(`📤 [WhatsApp Envoi] Envoi de la réponse à ${remoteJid}: "${messageText}"`);
 
       const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -206,7 +201,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          number: cleanTargetPhone,
+          number: remoteJid,
           options: { delay: 1200, presence: 'composing' },
           textMessage: { text: messageText }
         })

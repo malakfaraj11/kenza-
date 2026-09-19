@@ -47,7 +47,7 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
 
       if (apiUrl && apiKey && instanceName) {
         try {
-          const cleanTargetPhone = phone.replace(/@.*$/, '').replace(/[^0-9]/g, '');
+          const targetNumber = phone;
           const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
           
           const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
@@ -57,7 +57,7 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-              number: cleanTargetPhone,
+              number: targetNumber,
               options: { delay: 1200, presence: 'composing' },
               textMessage: { text: messageText }
             })
