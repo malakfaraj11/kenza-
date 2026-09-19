@@ -96,12 +96,7 @@ RÈGLES COMMERCIALES & ZÉRO-HALLUCINATION :
 - Il n'y a STRICTEMENT AUCUNE AUTRE possibilité (pas de carte, pas de virement, etc.).
 - Tu ne dois JAMAIS poser la question au client : ne lui demande JAMAIS comment il veut payer, ni s'il veut payer à la livraison !
 - Le paiement à la livraison est automatique, évident et implicite pour toutes les commandes.
-- Si tu résumes ou confirmes une commande, indique simplement de manière informative que le paiement se fera en espèces à la livraison ("khlass f l'istilam"), mais ne demande jamais son choix.
-
-⚠️ INTERDICTION ABSOLUE DE CITER UN NOM OU PRÉNOM DE CLIENT (NE JAMAIS DIRE DE NOM) :
-- IL EST STRICTEMENT ET TOTALEMENT INTERDIT de mentionner, prononcer, inventer ou inclure un prénom ou nom de client dans tes messages (ex: INTERDIT formel de dire "Salam Fatima", "Salam Amine", "Tbarkellah Salma", "Lalla Fatima", "Sidi Amine", etc.).
-- Ne devine JAMAIS un nom, et n'utilise JAMAIS de nom de personne même si le client s'est présenté ou qu'un nom apparaît dans la conversation.
-- Reste TOUJOURS polie, chaleureuse et naturelle sans AUCUN nom : utilise simplement "Salam!", "Salam labas 3lik!", "Merhba bik!", "Commande dyalk tssjlat b najah!", "Tbarkellah, commande tssjlat!", etc.`;
+- Si tu résumes ou confirmes une commande, indique simplement de manière informative que le paiement se fera en espèces à la livraison ("khlass f l'istilam"), mais ne demande jamais son choix.`;
 
 const VALIDATOR_PROMPT = `Tu es le Validateur Strict Anti-Hallucination & Contrôleur Qualité (Google Gemini).
 
@@ -109,10 +104,7 @@ TES RÈGLES DE VALIDATION STRICTES :
 1. ANTI-HALLUCINATION : Vérifie que le message de Kenza ne contient aucun prix ni stock inventé par rapport aux données des outils.
 2. CONTRÔLE DE L'ALPHABET (CRITIQUE) : AUCUN CARACTÈRE EN ALPHABET ARABE N'EST ACCEPTÉ. La réponse doit être 100% en lettres latines (Arabizi pour la Darija, avec chiffres 3, 7, 9). Si le message contient des lettres arabes, tu DOIS le transcrire intégralement en lettres latines (Arabizi).
 3. INTERDICTION DE DEMANDER LE MODE DE PAIEMENT : Kenza ne doit JAMAIS demander au client comment il veut payer ni s'il souhaite payer à la livraison. Le paiement est obligatoirement et uniquement à la livraison.
-4. SUPPRESSION STRICTE DE TOUT NOM OU PRÉNOM DE CLIENT (CRITIQUE) :
-- Kenza ne doit JAMAIS mentionner, inventer ou citer un nom ou prénom de personne (ex: "Salma", "Amine", "Fatima", "Mohammed", "Khadija", etc.).
-- Si le message contient un prénom ou nom de personne (ex: "Tbarkellah Salma", "Salam Fatima"), tu DOIS le SUPPRIMER IMMÉDIATEMENT pour ne conserver qu'une formulation naturelle et universelle (ex: "Tbarkellah, commande tssjlat b najah!", "Salam labas 3lik!").
-5. SORTIE ÉPURÉE : Renvoie UNIQUEMENT la réponse validée prête pour WhatsApp. Aucun préfixe, aucun commentaire.`;
+4. SORTIE ÉPURÉE : Renvoie UNIQUEMENT la réponse validée prête pour WhatsApp. Aucun préfixe, aucun commentaire.`;
 
 // 5. Les Nœuds du Graphe Multi-Agent
 
@@ -146,7 +138,11 @@ async function routerNode(state: typeof AgentState.State) {
 async function writerNode(state: typeof AgentState.State) {
   console.log("➡️ [Agent] Entrée dans writerNode (OpenAI)...");
   const { messages } = state;
-  const conversationMessages = [new SystemMessage(WRITER_PROMPT), ...messages];
+  const conversationMessages = [
+    new SystemMessage(WRITER_PROMPT), 
+    ...messages,
+    new SystemMessage("⚠️ CRITICAL REMINDER: Your response MUST be 100% in LATIN letters (Arabizi). NEVER output any Arabic characters (like ش, ك, ر, ا, etc.).")
+  ];
   const responseText = await writerLLM.invoke(conversationMessages);
   return { messages: [responseText] };
 }
@@ -157,10 +153,10 @@ async function validatorNode(state: typeof AgentState.State) {
   const conversationMessages = [
     new SystemMessage(VALIDATOR_PROMPT),
     ...messages,
-    new HumanMessage("Valide ce message. Rappel strict: EXCLUSIVEMENT en lettres latines (Arabizi avec 3, 7, 9 pour la Darija), ZÉRO caractère en alphabet arabe.")
+    new HumanMessage("Valide ce message. Rappel strict: EXCLUSIVEMENT en lettres latines (Arabizi avec 3, 7, 9 pour la Darija), ZÉRO caractère en alphabet arabe. Transcris tout texte arabe en Arabizi.")
   ];
 
-  if (!geminiQuotaExhausted && geminiKey && geminiKey.trim() !== '') {
+  if (geminiKey && geminiKey.trim() !== '') {
     try {
       const validatorLLM = new ChatGoogleGenerativeAI({
         model: 'gemini-3.6-flash',
@@ -171,17 +167,21 @@ async function validatorNode(state: typeof AgentState.State) {
       return { messages: [responseText] };
     } catch (e: any) {
       console.warn("⚠️ [Gemini API RateLimit] Validation via OpenAI fallback.");
-      geminiQuotaExhausted = true;
+      try {
+         const fallbackValidator = new ChatOpenAI({
+           modelName: process.env.LLM_MODEL || 'gpt-4o-mini',
+           temperature: 0,
+           apiKey: process.env.OPENAI_API_KEY,
+           configuration: { baseURL: process.env.OPENAI_BASE_URL }
+         });
+         const responseText = await fallbackValidator.invoke(conversationMessages);
+         return { messages: [responseText] };
+      } catch (err) {
+         return {};
+      }
     }
   }
-
-  // Validateur de secours (OpenAI)
-  try {
-    const responseText = await writerLLM.invoke(conversationMessages);
-    return { messages: [responseText] };
-  } catch (e) {
-    return {};
-  }
+  return {};
 }
 
 // 6. Logique de Routage Conditionnel
@@ -217,12 +217,24 @@ const workflow = new StateGraph(AgentState)
 
 export const kenzaAgentGraph = workflow.compile();
 
+function transliterateArabic(text: string): string {
+  const map: Record<string, string> = {
+    'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ء': "'", 'ب': 'b', 'ت': 't', 'ث': 'th',
+    'ج': 'j', 'ح': '7', 'خ': 'kh', 'د': 'd', 'ذ': 'd', 'ر': 'r', 'ز': 'z', 'س': 's',
+    'ش': 'ch', 'ص': 's', 'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': '3', 'غ': 'gh', 'ف': 'f',
+    'ق': '9', 'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'w', 'ي': 'y',
+    'ى': 'a', 'ة': 'a', 'ئ': "'", 'ؤ': "'", '،': ',', '؟': '?', '؛': ';'
+  };
+  let noTachkeel = text.replace(/[\u064B-\u065F]/g, '');
+  return noTachkeel.split('').map(char => map[char] || char).join('');
+}
+
 export function stringifyMessageContent(content: any): string {
+  let textResult = '';
   if (typeof content === 'string') {
-    return content;
-  }
-  if (Array.isArray(content)) {
-    return content
+    textResult = content;
+  } else if (Array.isArray(content)) {
+    textResult = content
       .map((item) => {
         if (typeof item === 'string') return item;
         if (item && typeof item === 'object') {
@@ -234,12 +246,17 @@ export function stringifyMessageContent(content: any): string {
       .filter(Boolean)
       .join('\n')
       .trim();
+  } else if (content && typeof content === 'object') {
+    if ('text' in content && typeof content.text === 'string') textResult = content.text;
+    if ('content' in content && typeof content.content === 'string') textResult = content.content;
   }
-  if (content && typeof content === 'object') {
-    if ('text' in content && typeof content.text === 'string') return content.text;
-    if ('content' in content && typeof content.content === 'string') return content.content;
+  
+  if (!textResult) {
+    textResult = String(content || '');
   }
-  return String(content || '');
+
+  // Filet de sécurité anti-arabe: Translitère tout caractère arabe restant
+  return transliterateArabic(textResult);
 }
 
 /**
@@ -260,17 +277,8 @@ export async function chatWithKenza(userMessage: string, clientPhone: string = '
   const finalMessages = result.messages;
   const lastMsg = finalMessages[finalMessages.length - 1];
 
-  let cleanReply = stringifyMessageContent(lastMsg?.content);
-  // Nettoyage de sécurité strict : convertir les formules de politesse arabes résiduelles en Arabizi
-  cleanReply = cleanReply
-    .replace(/شكرا بزاف!?/g, 'Chokran bzaf!')
-    .replace(/شكرا/g, 'Chokran')
-    .replace(/[\u0600-\u06FF]/g, '')
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-
   return {
-    reply: cleanReply,
+    reply: stringifyMessageContent(lastMsg?.content),
     messages: finalMessages,
   };
 }

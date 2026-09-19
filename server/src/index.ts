@@ -170,8 +170,9 @@ fastify.post('/api/chat', async (request, reply) => {
     conversationHistories.set(conversationId, response.messages);
 
     // 2. Programmer/Annuler la relance différée selon le réglage personnalisé (delayMinutes)
-    const hasOrder = response.messages.some((m: any) => m.tool_calls?.some((t: any) => t.name === 'create_order'));
-    if (hasOrder || !relanceSettings.enabled) {
+    const newMessages = response.messages.slice(history.length);
+    const orderCreatedInThisTurn = newMessages.some((m: any) => m.tool_calls?.some((t: any) => t.name === 'create_order'));
+    if (orderCreatedInThisTurn || !relanceSettings.enabled) {
       await abandonedCartQueue.remove(phone).catch(() => {});
     } else {
       await abandonedCartQueue.remove(phone).catch(() => {});
@@ -236,8 +237,9 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     conversationHistories.set(remoteJid, response.messages);
 
     // Programmer la relance différée WhatsApp
-    const hasOrder = response.messages.some((m: any) => m.tool_calls?.some((t: any) => t.name === 'create_order'));
-    if (hasOrder || !relanceSettings.enabled) {
+    const newMessages = response.messages.slice(history.length);
+    const orderCreatedInThisTurn = newMessages.some((m: any) => m.tool_calls?.some((t: any) => t.name === 'create_order'));
+    if (orderCreatedInThisTurn || !relanceSettings.enabled) {
       await abandonedCartQueue.remove(remoteJid).catch(() => {});
     } else {
       await abandonedCartQueue.remove(remoteJid).catch(() => {});

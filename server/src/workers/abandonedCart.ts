@@ -29,14 +29,18 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
     console.log(`⏳ [BullMQ] Exécution de la relance pour le client : ${phone}`);
     const history = conversationHistories.get(phone) || [];
 
-    // Vérifier si le dernier message est déjà une réponse du client
+    // Vérifier si le dernier message est déjà une réponse du client ou une commande confirmée
     const lastMsg = history[history.length - 1];
     if (lastMsg && (lastMsg.name === 'user' || lastMsg._getType?.() === 'human')) {
       console.log(`⏹️ [BullMQ] Relance annulée pour ${phone} car le client a déjà répondu !`);
       return;
     }
+    if (lastMsg && lastMsg.tool_calls?.some((t: any) => t.name === 'create_order')) {
+      console.log(`⏹️ [BullMQ] Relance annulée pour ${phone} car la dernière action était la validation d'une commande.`);
+      return;
+    }
 
-    const systemPrompt = `[SYSTEM] Le client n'a pas répondu depuis un moment. Génère un message très court, chaleureux et bienveillant en Darija (lettres latines / Arabizi) pour savoir s'il est toujours intéressé par les articles discutés précédemment ou s'il a besoin d'aide. Ne sois pas intrusif. Ne mentionne STRICTEMENT AUCUN nom ni prénom de personne.`;
+    const systemPrompt = `[SYSTEM] Le client n'a pas répondu depuis un moment. Génère un message très court, chaleureux et bienveillant en Darija (lettres latines / Arabizi) pour savoir s'il est toujours intéressé par les articles discutés précédemment ou s'il a besoin d'aide. Ne sois pas intrusif.`;
 
     try {
       const response = await chatWithKenza(systemPrompt, phone, history);
