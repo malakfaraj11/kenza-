@@ -1,6 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import formbody from '@fastify/formbody';
+import fastifyStatic from '@fastify/static';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -560,6 +561,30 @@ async function start() {
 
     await fastify.register(cors, { origin: true });
     await fastify.register(formbody, { bodyLimit: 100 * 1024 * 1024 });
+
+    // Enregistrement du service de fichiers statiques pour le frontend React SPA
+    const clientDistPath = path.resolve(__dirname, '../../client/dist');
+    if (fs.existsSync(clientDistPath)) {
+      await fastify.register(fastifyStatic, {
+        root: clientDistPath,
+        prefix: '/',
+        wildcard: false
+      });
+      console.log(`📁 [Static] Frontend React disponible depuis ${clientDistPath}`);
+    } else {
+      console.log(`⚠️ [Static] Repertoire client/dist non trouvé. Exécutez 'npm run build'`);
+    }
+
+    // Gestion du fallback 404 pour SPA React Routing
+    fastify.setNotFoundHandler((request, reply) => {
+      if (request.raw.url?.startsWith('/api')) {
+        reply.status(404).send({ error: 'Route API introuvable' });
+      } else if (fs.existsSync(clientDistPath)) {
+        reply.sendFile('index.html');
+      } else {
+        reply.status(404).send({ error: 'Page non trouvée' });
+      }
+    });
 
     const port = parseInt(process.env.PORT || '3000', 10);
     await fastify.listen({ port, host: '0.0.0.0' });
