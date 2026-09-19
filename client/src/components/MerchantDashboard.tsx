@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { MessageSquare, Bot, Package, AlertTriangle, RefreshCw, CheckCircle2, ArrowRight, Eye, X, Send, Loader2, Phone, MapPin, Truck } from 'lucide-react';
+import { MessageSquare, Bot, Package, AlertTriangle, RefreshCw, CheckCircle2, ArrowRight, Eye, X, Send, Loader2, Phone, MapPin, Truck, ShoppingBag, DollarSign } from 'lucide-react';
 
 interface Stats {
   messagesRecus: number;
   reponsesLlm: number;
   produitsEnStock: number;
   escaladesEnAttente: number;
+  totalCommandes?: number;
+  chiffreAffairesMad?: number;
 }
 
 export function MerchantDashboard() {
@@ -13,10 +15,13 @@ export function MerchantDashboard() {
     messagesRecus: 0,
     reponsesLlm: 0,
     produitsEnStock: 0,
-    escaladesEnAttente: 0
+    escaladesEnAttente: 0,
+    totalCommandes: 0,
+    chiffreAffairesMad: 0
   });
 
   const [escalades, setEscalades] = useState<any[]>([]);
+  const [orders, setOrders] = useState<any[]>([]);
   const [selectedEscalade, setSelectedEscalade] = useState<any | null>(null);
 
   // Modal Form States
@@ -39,6 +44,12 @@ export function MerchantDashboard() {
       if (resEscalades.ok) {
         const dataEscalades = await resEscalades.json();
         setEscalades(dataEscalades);
+      }
+
+      const resOrders = await fetch('/api/dashboard/orders');
+      if (resOrders.ok) {
+        const dataOrders = await resOrders.json();
+        setOrders(dataOrders);
       }
     } catch (e) {
       // Fallback
@@ -189,9 +200,125 @@ export function MerchantDashboard() {
             <span>Demandes d'intervention vendeur</span>
           </div>
         </div>
+
+        {/* Metric 5: Commandes Enregistrées */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Commandes Enregistrées</p>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-emerald-600 mt-2">{stats.totalCommandes ?? orders.length}</h3>
+            </div>
+            <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
+              <ShoppingBag className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-xs text-emerald-600 font-medium">
+            <span>Validées en base de données</span>
+          </div>
+        </div>
+
+        {/* Metric 6: Chiffre d'Affaires */}
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+          <div className="flex justify-between items-start">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Chiffre d'Affaires</p>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-indigo-700 mt-2">
+                {(stats.chiffreAffairesMad ?? 0).toLocaleString()} <span className="text-sm font-bold text-gray-500">MAD</span>
+              </h3>
+            </div>
+            <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+              <DollarSign className="w-6 h-6" />
+            </div>
+          </div>
+          <div className="mt-4 flex items-center text-xs text-indigo-600 font-medium">
+            <span>Total ventes confirmées</span>
+          </div>
+        </div>
       </div>
 
-      {/* Recent Activity & Escalations Feed */}
+      {/* 2. RECENT ORDERS TABLE (Visible immediately to Vendor) */}
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+          <div>
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-bold text-gray-900 text-base">Commandes Récentes (WhatsApp &amp; Vendeur)</h3>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">Toutes les commandes enregistrées automatiquement en base de données par Kenza</p>
+          </div>
+          <span className="px-3 py-1 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-full border border-indigo-200/60">
+            {orders.length} commande(s)
+          </span>
+        </div>
+
+        <div className="overflow-x-auto">
+          {orders.length > 0 ? (
+            <table className="w-full text-left text-xs text-gray-600">
+              <thead className="bg-gray-50/80 text-gray-700 uppercase tracking-wider text-[11px] font-semibold border-b border-gray-200">
+                <tr>
+                  <th className="px-5 py-3.5">Réf. Commande</th>
+                  <th className="px-5 py-3.5">Client &amp; Téléphone</th>
+                  <th className="px-5 py-3.5">Ville Livraison</th>
+                  <th className="px-5 py-3.5">Montant Total</th>
+                  <th className="px-5 py-3.5">Paiement</th>
+                  <th className="px-5 py-3.5">Statut</th>
+                  <th className="px-5 py-3.5">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {orders.map((ord) => (
+                  <tr key={ord.id} className="hover:bg-indigo-50/30 transition">
+                    <td className="px-5 py-4 font-mono font-bold text-indigo-600">
+                      {ord.id}
+                    </td>
+                    <td className="px-5 py-4">
+                      <div className="font-semibold text-gray-900">{ord.client_nom || 'Client WhatsApp'}</div>
+                      <div className="text-[11px] text-gray-400 font-mono">{ord.telephone || '-'}</div>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="inline-flex items-center gap-1 font-medium text-gray-700">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" /> {ord.ville_livraison || 'Non spécifiée'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 font-bold text-gray-900">
+                      {ord.total_mad} DH
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className="px-2 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-medium rounded-full">
+                        {ord.mode_paiement || 'à la livraison'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                        ord.statut === 'livrée' 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : ord.statut === 'annulée'
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                      }`}>
+                        {ord.statut || 'en préparation'}
+                      </span>
+                    </td>
+                    <td className="px-5 py-4 text-gray-400 text-[11px]">
+                      {ord.date_commande ? new Date(ord.date_commande).toLocaleString('fr-FR', {
+                        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+                      }) : '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="p-8 text-center text-gray-500 text-xs sm:text-sm">
+              <ShoppingBag className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+              <p className="font-semibold text-gray-700">Aucune commande enregistrée pour le moment.</p>
+              <p className="text-xs text-gray-400 mt-1">Dès qu'une commande est confirmée par un client, elle apparaîtra directement ici.</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* 3. Recent Activity & Escalations Feed */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-6 border-b border-gray-200 flex justify-between items-center">
           <div>

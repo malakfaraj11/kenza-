@@ -242,15 +242,20 @@ fastify.get('/api/dashboard/stats', async () => {
 
   const stockRes = await query(`SELECT COUNT(*) AS total_produits FROM catalogue;`);
   const escaladesRes = await query(`SELECT COUNT(*) AS escalades_en_attente FROM escalades WHERE statut = 'en_attente';`);
+  const ordersRes = await query(`SELECT COUNT(*) AS total_commandes, COALESCE(SUM(total_mad), 0) AS total_ca FROM commandes;`);
 
   const produitsEnStock = parseInt(stockRes.rows[0]?.total_produits || '0', 10);
   const escaladesEnAttente = parseInt(escaladesRes.rows[0]?.escalades_en_attente || '0', 10);
+  const totalCommandes = parseInt(ordersRes.rows[0]?.total_commandes || '0', 10);
+  const chiffreAffairesMad = parseFloat(ordersRes.rows[0]?.total_ca || '0');
 
   return {
     messagesRecus: totalMessagesRecus,
     reponsesLlm: totalReponsesLlm,
     produitsEnStock: produitsEnStock,
-    escaladesEnAttente: escaladesEnAttente
+    escaladesEnAttente: escaladesEnAttente,
+    totalCommandes: totalCommandes,
+    chiffreAffairesMad: chiffreAffairesMad
   };
 });
 

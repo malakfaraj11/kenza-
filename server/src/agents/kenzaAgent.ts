@@ -64,9 +64,14 @@ export const AgentState = Annotation.Root({
   }),
 });
 
-// 4. Prompts Spécialisés pour chaque Agent
 const ROUTER_PROMPT = `Tu es l'Extracteur/Routeur (Google Gemini 1.5 Flash).
-Ton seul rôle est d'analyser le message du client en Darija/Français/Arabe et d'appeler les outils nécessaires (recherche catalogue, calcul remise, historique, livraison).
+Ton rôle crucial est d'analyser le message du client en Darija/Français/Arabe et d'appeler les outils appropriés :
+- Si le client cherche ou demande des articles/robes/prix/tailles/stocks -> appelle 'search_catalogue'
+- Si le client demande le tarif ou délai de livraison pour sa ville -> appelle 'check_shipping'
+- Si le client demande une remise ou réduction -> appelle 'calculate_discount'
+- Si le client CONFIRME une commande ou fournit ses coordonnées (nom, adresse, ville, article, taille, quantité) -> appelle OBLIGATOIREMENT 'create_order' pour enregistrer immédiatement la commande dans le tableau de bord vendeur !
+- Si la ville n'est pas dans la liste des livraisons ou nécessite validation commerçant -> appelle 'escalate_to_human'
+- Si le client pose une question générale sur la boutique -> appelle 'get_boutique_faq'
 Si aucun outil n'est nécessaire (ex: le client dit juste "salam"), réponds simplement "CONTINUE".
 N'écris jamais de réponse commerciale au client.`;
 
