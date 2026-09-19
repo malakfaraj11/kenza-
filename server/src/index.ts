@@ -242,12 +242,19 @@ fastify.get('/api/dashboard/stats', async () => {
 
   const stockRes = await query(`SELECT COUNT(*) AS total_produits FROM catalogue;`);
   const escaladesRes = await query(`SELECT COUNT(*) AS escalades_en_attente FROM escalades WHERE statut = 'en_attente';`);
-  const ordersRes = await query(`SELECT COUNT(*) AS total_commandes, COALESCE(SUM(total_mad), 0) AS total_ca FROM commandes;`);
+  const commandesRes = await query(`
+    SELECT 
+      COUNT(*) AS total_commandes,
+      COALESCE(SUM(CASE WHEN statut != 'annulée' THEN total_mad ELSE 0 END), 0) AS chiffre_affaires,
+      COUNT(*) FILTER (WHERE statut = 'en préparation') AS en_preparation
+    FROM commandes;
+  `);
 
   const produitsEnStock = parseInt(stockRes.rows[0]?.total_produits || '0', 10);
   const escaladesEnAttente = parseInt(escaladesRes.rows[0]?.escalades_en_attente || '0', 10);
-  const totalCommandes = parseInt(ordersRes.rows[0]?.total_commandes || '0', 10);
-  const chiffreAffairesMad = parseFloat(ordersRes.rows[0]?.total_ca || '0');
+  const totalCommandes = parseInt(commandesRes.rows[0]?.total_commandes || '0', 10);
+  const chiffreAffaires = parseFloat(commandesRes.rows[0]?.chiffre_affaires || '0');
+  const enPreparation = parseInt(commandesRes.rows[0]?.en_preparation || '0', 10);
 
   return {
     messagesRecus: totalMessagesRecus,
@@ -255,7 +262,8 @@ fastify.get('/api/dashboard/stats', async () => {
     produitsEnStock: produitsEnStock,
     escaladesEnAttente: escaladesEnAttente,
     totalCommandes: totalCommandes,
-    chiffreAffairesMad: chiffreAffairesMad
+    chiffreAffaires: chiffreAffaires,
+    enPreparation: enPreparation
   };
 });
 
@@ -377,17 +385,49 @@ Livraison prévue à l'adresse : ${adresse}. Merci pour votre confiance !`;
 });
 
 /**
- * 6. Liste des commandes récentes
+ * 6. Liste des commandes récentes (avec détails des articles et client)
  */
 fastify.get('/api/dashboard/orders', async () => {
   const res = await query(`
-    SELECT c.id, c.date_commande, c.statut, c.total_mad, c.ville_livraison, c.mode_paiement, cl.nom AS client_nom, cl.telephone
+    SELECT c.id, c.date_commande, c.statut, c.total_mad, c.total_articles_mad, c.frais_livraison_mad,
+           c.ville_livraison, c.adresse_livraison, c.mode_paiement,
+           cl.nom AS client_nom, cl.telephone,
+           COALESCE(
+             json_agg(
+               json_build_object('ref', l.ref, 'modele', l.modele, 'taille', l.taille, 'quantite', l.quantite, 'prix_unitaire_mad', l.prix_unitaire_mad)
+             ) FILTER (WHERE l.id IS NOT NULL),
+             '[]'
+           ) AS articles
     FROM commandes c
     LEFT JOIN clients cl ON c.client_id = cl.client_id
+    LEFT JOIN commandes_lignes l ON c.id = l.commande_id
+    GROUP BY c.id, c.date_commande, c.statut, c.total_mad, c.total_articles_mad, c.frais_livraison_mad,
+             c.ville_livraison, c.adresse_livraison, c.mode_paiement, cl.nom, cl.telephone
     ORDER BY c.date_commande DESC
-    LIMIT 20;
+    LIMIT 50;
   `);
   return res.rows;
+});
+
+/**
+ * 6.5. Mise à jour du statut d'une commande par le vendeur
+ */
+fastify.post('/api/dashboard/orders/:id/status', async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const { statut } = request.body as { statut: string };
+
+  if (!statut) {
+    return reply.status(400).send({ error: 'Le champ statut est requis.' });
+  }
+
+  try {
+    await query(`UPDATE commandes SET statut = $1 WHERE id = $2;`, [statut, id]);
+    console.log(`📦 [Statut Commande] Commande ${id} passée au statut: "${statut}"`);
+    return { success: true, id, statut };
+  } catch (err: any) {
+    fastify.log.error(err);
+    return reply.status(500).send({ error: "Erreur lors de la mise à jour du statut", details: err.message });
+  }
 });
 
 /**
