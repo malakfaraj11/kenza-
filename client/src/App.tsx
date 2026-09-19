@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, Package, MessageCircle, LogOut, Bot, Store, ArrowRight, Bell } from 'lucide-react';
+import { LayoutDashboard, Package, MessageCircle, LogOut, Bot, Store, ArrowRight, Bell, Menu, X } from 'lucide-react';
 import { MerchantDashboard } from './components/MerchantDashboard.js';
 import { CatalogueView } from './components/CatalogueView.js';
 import { WhatsAppConnectionView } from './components/WhatsAppConnectionView.js';
@@ -8,6 +8,7 @@ export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginView, setIsLoginView] = useState(true);
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'stock' | 'whatsapp'>('whatsapp');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Vendor Account Form State
   const [vendorAuth, setVendorAuth] = useState({
@@ -25,6 +26,7 @@ export function App() {
   const handleLogout = () => {
     setIsAuthenticated(false);
     setCurrentTab('whatsapp');
+    setIsSidebarOpen(false);
   };
 
   return (
@@ -112,8 +114,111 @@ export function App() {
 
       {/* 2. AUTHENTICATED VENDOR DASHBOARD LAYOUT */}
       {isAuthenticated && (
-        <div className="flex h-screen w-full overflow-hidden">
-          {/* SIDEBAR NAVIGATION */}
+        <div className="flex h-screen w-full overflow-hidden relative">
+          {/* MOBILE SLIDE-OVER DRAWER MENU OVERLAY */}
+          {isSidebarOpen && (
+            <div className="fixed inset-0 z-50 flex md:hidden">
+              {/* Dark Backdrop */}
+              <div
+                className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm transition-opacity"
+                onClick={() => setIsSidebarOpen(false)}
+              />
+
+              {/* Drawer Box */}
+              <div className="relative w-72 max-w-[85vw] bg-slate-900 text-slate-300 h-full p-6 flex flex-col shadow-2xl z-50 border-r border-slate-800">
+                {/* Drawer Header */}
+                <div className="flex items-center justify-between pb-6 border-b border-slate-800">
+                  <div className="flex items-center gap-3 text-indigo-400">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-black">
+                      K
+                    </div>
+                    <div>
+                      <span className="font-extrabold text-base text-white tracking-tight">Kenza SaaS</span>
+                      <span className="text-[10px] block text-indigo-400 font-medium">Espace Vendeur</span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsSidebarOpen(false)}
+                    className="p-2 rounded-xl bg-slate-800 text-slate-400 hover:text-white transition"
+                    title="Fermer le menu"
+                  >
+                    <X className="w-5 h-5 text-red-400" />
+                  </button>
+                </div>
+
+                {/* Navigation Links */}
+                <nav className="flex-1 overflow-y-auto py-6 space-y-2">
+                  <button
+                    onClick={() => {
+                      setCurrentTab('dashboard');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold text-left ${
+                      currentTab === 'dashboard'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <LayoutDashboard className="w-5 h-5" />
+                    Tableau de bord
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentTab('stock');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold text-left ${
+                      currentTab === 'stock'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Package className="w-5 h-5" />
+                    Mon Stock &amp; Fichiers
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setCurrentTab('whatsapp');
+                      setIsSidebarOpen(false);
+                    }}
+                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-sm font-semibold text-left ${
+                      currentTab === 'whatsapp'
+                        ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/30'
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <MessageCircle className="w-5 h-5 text-emerald-400" />
+                    WhatsApp IA (QR Code)
+                  </button>
+                </nav>
+
+                {/* Drawer Footer */}
+                <div className="pt-4 border-t border-slate-800 bg-slate-950/50 -mx-6 -mb-6 p-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold text-sm">
+                      {vendorAuth.storeName.charAt(0)}
+                    </div>
+                    <div className="overflow-hidden">
+                      <p className="text-xs font-bold text-white truncate">{vendorAuth.storeName}</p>
+                      <p className="text-[10px] text-slate-400 truncate">{vendorAuth.email}</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-bold text-red-400 bg-red-500/10 hover:bg-red-500/20 rounded-xl transition"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Déconnexion
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* DESKTOP SIDEBAR NAVIGATION */}
           <aside className="w-64 bg-slate-900 text-slate-300 border-r border-slate-800 flex flex-col hidden md:flex z-20 flex-shrink-0">
             <div className="h-16 flex items-center px-6 border-b border-slate-800">
               <div className="flex items-center gap-3 text-indigo-400">
@@ -190,7 +295,17 @@ export function App() {
           <main className="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
             {/* Header */}
             <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-10 shadow-sm">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                {/* HAMBURGER MENU TOGGLE BUTTON (Opens / Closes Navigation Drawer) */}
+                <button
+                  onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-xl transition border border-indigo-200 font-bold text-xs shadow-sm"
+                  aria-label="Ouvrir le menu de navigation"
+                >
+                  {isSidebarOpen ? <X className="w-5 h-5 text-red-600" /> : <Menu className="w-5 h-5 text-indigo-600" />}
+                  <span className="font-extrabold">{isSidebarOpen ? 'Fermer Menu' : 'Menu'}</span>
+                </button>
+
                 <h2 className="text-base sm:text-lg font-bold text-slate-800 capitalize truncate">
                   {currentTab === 'stock'
                     ? 'Gestion du Stock'
@@ -223,8 +338,8 @@ export function App() {
               {currentTab === 'whatsapp' && <WhatsAppConnectionView />}
             </div>
 
-            {/* Mobile Fixed Bottom Navigation Bar (Visible on all mobile screens) */}
-            <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-900 border-t border-slate-800 flex justify-around items-center py-2 px-2 shadow-2xl text-slate-400">
+            {/* Mobile Fixed Bottom Navigation Bar */}
+            <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900 border-t border-slate-800 flex justify-around items-center py-2 px-2 shadow-2xl text-slate-400">
               <button
                 onClick={() => setCurrentTab('dashboard')}
                 className={`flex flex-col items-center gap-1 px-4 py-1 rounded-xl transition ${
