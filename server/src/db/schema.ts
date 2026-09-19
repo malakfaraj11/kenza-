@@ -1,6 +1,10 @@
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { query, pool } from './connection.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 export async function initDbSchema() {
   console.log('🔄 Initialisation du schéma de la base de données...');
@@ -8,6 +12,7 @@ export async function initDbSchema() {
   const sql = fs.readFileSync(schemaPath, 'utf8');
 
   await query(sql);
+  await query(`ALTER TABLE catalogue ADD COLUMN IF NOT EXISTS metadata JSONB DEFAULT '{}';`);
   console.log('✅ Schéma PostgreSQL initialisé avec succès !');
 }
 

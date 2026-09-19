@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS catalogue (
   stock INT NOT NULL DEFAULT 0,
   delai_reassort_jours INT,
   code_barre VARCHAR(100),
-  poids_g INT
+  poids_g INT,
+  metadata JSONB DEFAULT '{}'
 );
 
 -- 2. Table Promotions : Remises actives temporaires
