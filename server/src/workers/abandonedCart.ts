@@ -36,7 +36,7 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
       return;
     }
 
-    const systemPrompt = `[SYSTEM] Le client n'a pas répondu depuis un moment. Génère un message très court, chaleureux et bienveillant en Darija (lettres latines / Arabizi) pour savoir s'il est toujours intéressé par les articles discutés précédemment ou s'il a besoin d'aide. Ne sois pas intrusif.`;
+    const systemPrompt = `[SYSTEM] Le client n'a pas répondu depuis un moment. Génère un message très court, chaleureux et bienveillant en Darija (lettres latines / Arabizi) pour savoir s'il est toujours intéressé par les articles discutés précédemment ou s'il a besoin d'aide. Ne sois pas intrusif. Ne mentionne STRICTEMENT AUCUN nom ni prénom de personne.`;
 
     try {
       const response = await chatWithKenza(systemPrompt, phone, history);

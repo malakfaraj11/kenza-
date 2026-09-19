@@ -96,7 +96,12 @@ RÈGLES COMMERCIALES & ZÉRO-HALLUCINATION :
 - Il n'y a STRICTEMENT AUCUNE AUTRE possibilité (pas de carte, pas de virement, etc.).
 - Tu ne dois JAMAIS poser la question au client : ne lui demande JAMAIS comment il veut payer, ni s'il veut payer à la livraison !
 - Le paiement à la livraison est automatique, évident et implicite pour toutes les commandes.
-- Si tu résumes ou confirmes une commande, indique simplement de manière informative que le paiement se fera en espèces à la livraison ("khlass f l'istilam"), mais ne demande jamais son choix.`;
+- Si tu résumes ou confirmes une commande, indique simplement de manière informative que le paiement se fera en espèces à la livraison ("khlass f l'istilam"), mais ne demande jamais son choix.
+
+⚠️ INTERDICTION ABSOLUE DE CITER UN NOM OU PRÉNOM DE CLIENT (NE JAMAIS DIRE DE NOM) :
+- IL EST STRICTEMENT ET TOTALEMENT INTERDIT de mentionner, prononcer, inventer ou inclure un prénom ou nom de client dans tes messages (ex: INTERDIT formel de dire "Salam Fatima", "Salam Amine", "Tbarkellah Salma", "Lalla Fatima", "Sidi Amine", etc.).
+- Ne devine JAMAIS un nom, et n'utilise JAMAIS de nom de personne même si le client s'est présenté ou qu'un nom apparaît dans la conversation.
+- Reste TOUJOURS polie, chaleureuse et naturelle sans AUCUN nom : utilise simplement "Salam!", "Salam labas 3lik!", "Merhba bik!", "Commande dyalk tssjlat b najah!", "Tbarkellah, commande tssjlat!", etc.`;
 
 const VALIDATOR_PROMPT = `Tu es le Validateur Strict Anti-Hallucination & Contrôleur Qualité (Google Gemini).
 
@@ -104,7 +109,10 @@ TES RÈGLES DE VALIDATION STRICTES :
 1. ANTI-HALLUCINATION : Vérifie que le message de Kenza ne contient aucun prix ni stock inventé par rapport aux données des outils.
 2. CONTRÔLE DE L'ALPHABET (CRITIQUE) : AUCUN CARACTÈRE EN ALPHABET ARABE N'EST ACCEPTÉ. La réponse doit être 100% en lettres latines (Arabizi pour la Darija, avec chiffres 3, 7, 9). Si le message contient des lettres arabes, tu DOIS le transcrire intégralement en lettres latines (Arabizi).
 3. INTERDICTION DE DEMANDER LE MODE DE PAIEMENT : Kenza ne doit JAMAIS demander au client comment il veut payer ni s'il souhaite payer à la livraison. Le paiement est obligatoirement et uniquement à la livraison.
-4. SORTIE ÉPURÉE : Renvoie UNIQUEMENT la réponse validée prête pour WhatsApp. Aucun préfixe, aucun commentaire.`;
+4. SUPPRESSION STRICTE DE TOUT NOM OU PRÉNOM DE CLIENT (CRITIQUE) :
+- Kenza ne doit JAMAIS mentionner, inventer ou citer un nom ou prénom de personne (ex: "Salma", "Amine", "Fatima", "Mohammed", "Khadija", etc.).
+- Si le message contient un prénom ou nom de personne (ex: "Tbarkellah Salma", "Salam Fatima"), tu DOIS le SUPPRIMER IMMÉDIATEMENT pour ne conserver qu'une formulation naturelle et universelle (ex: "Tbarkellah, commande tssjlat b najah!", "Salam labas 3lik!").
+5. SORTIE ÉPURÉE : Renvoie UNIQUEMENT la réponse validée prête pour WhatsApp. Aucun préfixe, aucun commentaire.`;
 
 // 5. Les Nœuds du Graphe Multi-Agent
 
@@ -152,7 +160,7 @@ async function validatorNode(state: typeof AgentState.State) {
     new HumanMessage("Valide ce message. Rappel strict: EXCLUSIVEMENT en lettres latines (Arabizi avec 3, 7, 9 pour la Darija), ZÉRO caractère en alphabet arabe.")
   ];
 
-  if (geminiKey && geminiKey.trim() !== '') {
+  if (!geminiQuotaExhausted && geminiKey && geminiKey.trim() !== '') {
     try {
       const validatorLLM = new ChatGoogleGenerativeAI({
         model: 'gemini-3.6-flash',
@@ -162,11 +170,18 @@ async function validatorNode(state: typeof AgentState.State) {
       const responseText = await validatorLLM.invoke(conversationMessages);
       return { messages: [responseText] };
     } catch (e: any) {
-      console.warn("⚠️ [Gemini API RateLimit] Validation pass-through.");
-      return {};
+      console.warn("⚠️ [Gemini API RateLimit] Validation via OpenAI fallback.");
+      geminiQuotaExhausted = true;
     }
   }
-  return {};
+
+  // Validateur de secours (OpenAI)
+  try {
+    const responseText = await writerLLM.invoke(conversationMessages);
+    return { messages: [responseText] };
+  } catch (e) {
+    return {};
+  }
 }
 
 // 6. Logique de Routage Conditionnel
@@ -245,8 +260,17 @@ export async function chatWithKenza(userMessage: string, clientPhone: string = '
   const finalMessages = result.messages;
   const lastMsg = finalMessages[finalMessages.length - 1];
 
+  let cleanReply = stringifyMessageContent(lastMsg?.content);
+  // Nettoyage de sécurité strict : convertir les formules de politesse arabes résiduelles en Arabizi
+  cleanReply = cleanReply
+    .replace(/شكرا بزاف!?/g, 'Chokran bzaf!')
+    .replace(/شكرا/g, 'Chokran')
+    .replace(/[\u0600-\u06FF]/g, '')
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+
   return {
-    reply: stringifyMessageContent(lastMsg?.content),
+    reply: cleanReply,
     messages: finalMessages,
   };
 }
