@@ -12,39 +12,75 @@ import { query } from '../db/connection.js';
  */
 export const searchCatalogueTool = new DynamicStructuredTool({
   name: 'search_catalogue',
-  description: 'Recherche des articles dans le catalogue par nom/modèle, catégorie, couleur ou taille. Retourne le prix exact (avec promotion active si applicable), le stock disponible et les variantes.',
+  description: 'Recherche des articles dans le catalogue par nom/modèle, catégorie, couleur, taille ou attributs metadata. Retourne le prix exact (avec promotion active si applicable), le stock disponible et les variantes.',
   schema: z.object({
-    motsCles: z.string().describe('Mots clés de recherche (ex: chemise, caftan, veste beige, pantalon camel, M, L)'),
+    motsCles: z.string().describe('Mots clés de recherche (ex: chemise, caftan, veste beige, pantalon camel, M, L, foulard, bordeaux)'),
   }),
   func: async ({ motsCles }) => {
     try {
-      const terms = motsCles.trim().toLowerCase().split(/\s+/).filter(Boolean);
-      
-      let whereClauses: string[] = [];
-      let params: any[] = [];
-      let paramIdx = 1;
+      // Normalisation des synonymes Darija et pluriels courants vers les catégories du catalogue
+      const normalized = motsCles
+        .replace(/\brobes?\b/gi, 'robe')
+        .replace(/\bvestes?\b/gi, 'veste')
+        .replace(/\bchemises?\b/gi, 'chemise')
+        .replace(/\bpantalons?\b/gi, 'pantalon')
+        .replace(/\b9mis(at|a)?\b/gi, 'chemise')
+        .replace(/\b9miss(at|a)?\b/gi, 'chemise')
+        .replace(/\bserwal\b/gi, 'pantalon')
+        .replace(/\bksswa\b/gi, 'robe')
+        .replace(/\bsebbat\b/gi, 'chaussures')
+        .replace(/\bzif\b/gi, 'foulard')
+        .replace(/\bjaka\b/gi, 'veste')
+        .replace(/\bsmta\b/gi, 'ceinture')
+        .replace(/\bsak\b/gi, 'sac');
 
-      for (const term of terms) {
-        whereClauses.push(`(
-          LOWER(c.modele) LIKE $${paramIdx} OR 
-          LOWER(c.famille) LIKE $${paramIdx} OR 
-          LOWER(c.couleur) LIKE $${paramIdx} OR 
-          LOWER(c.taille) LIKE $${paramIdx} OR 
-          LOWER(c.matiere) LIKE $${paramIdx}
-        )`);
-        params.push(`%${term}%`);
-        paramIdx++;
+      const stopWords = new Set(['ou', 'wla', 'w', 'chi', 'dyal', 'l', 'la', 'le', 'les', 'des', 'de', 'un', 'une', 'pour', 'taman', 'prix', 'chhal', 'fin', 'wach', '3ndkom', '3ndkoum', 'bghit']);
+      let terms = normalized.trim().toLowerCase().split(/[\s,+/]+/)
+        .filter(t => t.length > 1 && !stopWords.has(t))
+        .map(t => (t.endsWith('s') && t.length > 3 && !['gris'].includes(t)) ? t.slice(0, -1) : t);
+      
+      if (terms.length === 0) {
+        terms = motsCles.trim().toLowerCase().split(/\s+/).filter(Boolean);
       }
 
-      const sql = `
-        SELECT c.*, 
-               p.prix_promo_mad, p.debut AS promo_debut, p.fin AS promo_fin
-        FROM catalogue c
-        LEFT JOIN promotions p ON c.ref = p.ref AND CURRENT_DATE BETWEEN p.debut AND p.fin
-        WHERE ${whereClauses.length > 0 ? whereClauses.join(' AND ') : 'TRUE'}
-        LIMIT 10;
-      `;
-      const res = await query(sql, params);
+      const buildQuery = (operator: 'AND' | 'OR') => {
+        let whereClauses: string[] = [];
+        let params: any[] = [];
+        let paramIdx = 1;
+
+        for (const term of terms) {
+          whereClauses.push(`(
+            LOWER(c.modele) LIKE $${paramIdx} OR 
+            LOWER(c.famille) LIKE $${paramIdx} OR 
+            LOWER(c.couleur) LIKE $${paramIdx} OR 
+            LOWER(c.taille) LIKE $${paramIdx} OR 
+            LOWER(c.matiere) LIKE $${paramIdx} OR
+            LOWER(c.metadata::text) LIKE $${paramIdx}
+          )`);
+          params.push(`%${term}%`);
+          paramIdx++;
+        }
+
+        const sql = `
+          SELECT c.*, 
+                 p.prix_promo_mad, p.debut AS promo_debut, p.fin AS promo_fin
+          FROM catalogue c
+          LEFT JOIN promotions p ON c.ref = p.ref AND CURRENT_DATE BETWEEN p.debut AND p.fin
+          WHERE ${whereClauses.length > 0 ? whereClauses.join(` ${operator} `) : 'TRUE'}
+          LIMIT 10;
+        `;
+        return { sql, params };
+      };
+
+      // Essai 1: Recherche stricte (AND)
+      let { sql, params } = buildQuery('AND');
+      let res = await query(sql, params);
+
+      // Essai 2: Si aucun résultat, recherche souple (OR)
+      if (res.rows.length === 0 && terms.length > 1) {
+        const flexible = buildQuery('OR');
+        res = await query(flexible.sql, flexible.params);
+      }
 
       if (res.rows.length === 0) {
         return JSON.stringify({
@@ -59,8 +95,7 @@ export const searchCatalogueTool = new DynamicStructuredTool({
         const prixFinal = enPromo ? parseFloat(r.prix_promo_mad) : parseFloat(r.prix_mad);
         const estEnRupture = r.stock <= 0;
 
-        let alternativesDisponibles = [];
-        // Si rupture de stock, rechercher automatiquement des alternatives disponibles dans la même famille
+        let alternativesDisponibles: any[] = [];
         if (estEnRupture) {
           const altRes = await query(`
             SELECT ref, modele, couleur, taille, prix_mad, stock
@@ -90,9 +125,8 @@ export const searchCatalogueTool = new DynamicStructuredTool({
           en_promotion: enPromo,
           stock: r.stock,
           en_rupture: estEnRupture,
-          // Règle du cahier des charges : ne jamais promettre de date de réassort
           message_stock: estEnRupture 
-            ? "Produit épuisé. Date de réassort non garantie (relever du commerçant)."
+            ? "Produit épuisé. Date de réassort non garantie."
             : `En stock (${r.stock} unité(s) disponible(s))`,
           alternatives_proposees: alternativesDisponibles
         });
@@ -107,27 +141,51 @@ export const searchCatalogueTool = new DynamicStructuredTool({
 
 /**
  * 2. Outil de vérification de Livraison par Ville
- * Vérifie strictement la grille des 12 villes.
- * Si la ville est absente -> Déclenche obligatoirement une escalade (pas d'estimation inventée).
  */
 export const checkShippingTool = new DynamicStructuredTool({
   name: 'check_shipping',
   description: 'Consulte les frais de livraison (MAD), le délai (heures) et les modes de paiement (paiement à la livraison, retrait boutique) pour une ville au Maroc.',
   schema: z.object({
-    ville: z.string().describe('Nom de la ville marocaine (ex: Casablanca, Rabat, Fès, Tanger)'),
+    ville: z.string().describe('Nom de la ville marocaine (ex: Casablanca, Rabat, Fès, Tanger, Marrakech, Agadir)'),
   }),
   func: async ({ ville }) => {
     try {
-      const res = await query(
-        `SELECT * FROM livraison WHERE LOWER(ville) = LOWER($1);`,
-        [ville.trim()]
+      let v = ville.trim().toLowerCase()
+        .replace(/\bcasa\b/g, 'casablanca')
+        .replace(/\bkesh\b|\bkech\b/g, 'marrakech')
+        .replace(/\bfez\b/g, 'fès')
+        .replace(/\btangier\b/g, 'tanger');
+
+      let res = await query(
+        `SELECT * FROM livraison WHERE LOWER(ville) = LOWER($1) OR LOWER(ville) LIKE LOWER($2);`,
+        [v, `%${v}%`]
       );
 
+      // Si pas trouvé dans la table livraison, chercher dans catalogue (si importé dynamiquement)
       if (res.rows.length === 0) {
+        const catLivr = await query(
+          `SELECT * FROM catalogue WHERE LOWER(modele) LIKE $1 OR LOWER(metadata->>'ville') = LOWER($2);`,
+          [`%livraison ${v}%`, v]
+        );
+
+        if (catLivr.rows.length > 0) {
+          const item = catLivr.rows[0];
+          const meta = item.metadata || {};
+          return JSON.stringify({
+            desservie: true,
+            ville: meta.ville || item.modele.replace(/^livraison /i, ''),
+            frais_mad: item.prix_mad,
+            delai_heures: meta.delai_heures || 48,
+            delai_texte: `${meta.delai_heures || 48} heures`,
+            paiement_a_la_livraison_disponible: meta.paiement_a_la_livraison === 'oui' || meta.paiement_a_la_livraison === true,
+            retrait_boutique_disponible: meta.retrait_boutique === 'oui' || meta.retrait_boutique === true
+          });
+        }
+
         return JSON.stringify({
           desservie: false,
           escalade_requise: true,
-          message: `La ville "${ville}" n'est pas dans la grille de livraison standard. Une escalade au commerçant est obligatoire.`
+          message: `La ville "${ville}" n'est pas répertoriée dans la grille de livraison standard. Une escalade au commerçant est nécessaire.`
         });
       }
 
@@ -149,7 +207,6 @@ export const checkShippingTool = new DynamicStructuredTool({
 
 /**
  * 3. Outil de Mémoire Client (Historique des commandes)
- * Retrouve le client par son numéro de téléphone et ses commandes précédentes.
  */
 export const getClientHistoryTool = new DynamicStructuredTool({
   name: 'get_client_history',
@@ -159,9 +216,13 @@ export const getClientHistoryTool = new DynamicStructuredTool({
   }),
   func: async ({ telephone }) => {
     try {
+      let rawPhone = telephone.trim().replace(/\s+/g, '');
+      if (rawPhone.startsWith('06')) rawPhone = '+2126' + rawPhone.slice(2);
+      if (rawPhone.startsWith('07')) rawPhone = '+2127' + rawPhone.slice(2);
+
       const clientRes = await query(
-        `SELECT * FROM clients WHERE telephone = $1 LIMIT 1;`,
-        [telephone.trim()]
+        `SELECT * FROM clients WHERE telephone = $1 OR telephone = $2 LIMIT 1;`,
+        [rawPhone, telephone.trim()]
       );
 
       if (clientRes.rows.length === 0) {
@@ -173,7 +234,6 @@ export const getClientHistoryTool = new DynamicStructuredTool({
 
       const client = clientRes.rows[0];
 
-      // Récupérer les 3 dernières commandes avec leurs lignes
       const cmdRes = await query(`
         SELECT c.id, c.date_commande, c.statut, c.total_mad, c.ville_livraison,
                json_agg(json_build_object('modele', cl.modele, 'taille', cl.taille, 'quantite', cl.quantite, 'prix', cl.prix_unitaire_mad)) AS articles
@@ -203,19 +263,16 @@ export const getClientHistoryTool = new DynamicStructuredTool({
 
 /**
  * 4. Outil de Contrôle de Remise & Garde-fou (Max 10%)
- * Applique la règle stricte du cahier des charges :
- * - Remise max 10% sans validation humaine.
- * - Au-delà -> Rejet et escalade obligatoire.
  */
 export const calculateDiscountTool = new DynamicStructuredTool({
   name: 'calculate_discount',
-  description: 'Vérifie si une demande de remise formulée par un client est autorisée (plafond strict de 10% maximum).',
+  description: 'Vérifie si une demande de remise formulée par un client est autorisée (plafond strict de 10% maximum selon la politique commerciale).',
   schema: z.object({
     pourcentageDemande: z.number().describe('Pourcentage de remise demandé (ex: 5 pour 5%, 15 pour 15%)'),
     montantInitial: z.number().describe('Montant total avant remise en MAD')
   }),
   func: async ({ pourcentageDemande, montantInitial }) => {
-    const PLAFOND_REMISE = 10; // 10% maximum selon politique-commerciale.md
+    const PLAFOND_REMISE = 10;
 
     if (pourcentageDemande <= 0) {
       return JSON.stringify({
@@ -230,7 +287,7 @@ export const calculateDiscountTool = new DynamicStructuredTool({
         escalade_requise: true,
         plancher_depasse: true,
         remise_maximale_possible: PLAFOND_REMISE,
-        message: `La remise de ${pourcentageDemande}% dépasse le plafond autorisé de ${PLAFOND_REMISE}%. Escalade obligatoire au commerçant.`
+        message: `La remise de ${pourcentageDemande}% dépasse le plafond commercial autorisé de ${PLAFOND_REMISE}%. Escalade obligatoire au commerçant.`
       });
     }
 
@@ -249,7 +306,6 @@ export const calculateDiscountTool = new DynamicStructuredTool({
 
 /**
  * 5. Outil de Création de Commande en Base de Données
- * Vérifie les stocks en temps réel, calcule la livraison, insère la commande et décrémente le stock.
  */
 export const createOrderTool = new DynamicStructuredTool({
   name: 'create_order',
@@ -261,12 +317,11 @@ export const createOrderTool = new DynamicStructuredTool({
     modePaiement: z.string().describe('Mode de paiement choisi (ex: à la livraison, virement, retrait boutique)'),
     articles: z.array(z.object({
       ref: z.string().describe('Référence produit (ex: REF-0001)'),
-      quantite: z.number().int().positive().describe('Quantité souhaitée')
+      quantite: z.number().int().describe('Quantité souhaitée')
     })).describe('Articles commandés')
   }),
   func: async ({ telephone, villeLivraison, adresseLivraison, modePaiement, articles }) => {
     try {
-      // 1. Trouver ou créer le client
       let clientRes = await query(`SELECT client_id, nom FROM clients WHERE telephone = $1 LIMIT 1;`, [telephone]);
       let clientId = clientRes.rows[0]?.client_id;
       if (!clientId) {
@@ -279,11 +334,9 @@ export const createOrderTool = new DynamicStructuredTool({
         await query(`UPDATE clients SET nb_commandes = nb_commandes + 1 WHERE client_id = $1;`, [clientId]);
       }
 
-      // 2. Frais de livraison
       const shipRes = await query(`SELECT frais_mad FROM livraison WHERE LOWER(ville) = LOWER($1);`, [villeLivraison]);
       const fraisLivraison = shipRes.rows.length > 0 ? parseFloat(shipRes.rows[0].frais_mad) : 35;
 
-      // 3. Valider les prix et stocks
       let totalArticles = 0;
       const lignesValidees = [];
 
@@ -319,13 +372,11 @@ export const createOrderTool = new DynamicStructuredTool({
       const totalMad = totalArticles + fraisLivraison;
       const commandeId = `CMD-${Math.floor(10000 + Math.random() * 90000)}`;
 
-      // 4. Insérer la commande
       await query(`
         INSERT INTO commandes (id, client_id, statut, total_articles_mad, frais_livraison_mad, total_mad, ville_livraison, mode_paiement, adresse_livraison)
         VALUES ($1, $2, 'en préparation', $3, $4, $5, $6, $7, $8);
       `, [commandeId, clientId, totalArticles, fraisLivraison, totalMad, villeLivraison, modePaiement, adresseLivraison]);
 
-      // 5. Insérer les lignes et décrémenter le stock
       for (const line of lignesValidees) {
         await query(`
           INSERT INTO commandes_lignes (commande_id, ref, modele, taille, quantite, prix_unitaire_mad)
@@ -351,7 +402,6 @@ export const createOrderTool = new DynamicStructuredTool({
 
 /**
  * 6. Outil d'Escalade vers l'Humain
- * Enregistre le ticket d'escalade dans la base pour le tableau de bord commerçant.
  */
 export const escalateToHumanTool = new DynamicStructuredTool({
   name: 'escalate_to_human',
@@ -359,7 +409,7 @@ export const escalateToHumanTool = new DynamicStructuredTool({
   schema: z.object({
     conversationId: z.string().describe('ID de la conversation (ex: CONV-1234)'),
     telephone: z.string().describe('Téléphone du client'),
-    raison: z.string().describe('Motif de l\'escalade (ex: ville hors grille, facture société, remise > 10%, réclamation)'),
+    raison: z.string().describe('Motif de l\'escalade (ex: ville hors grille, remise > 10%, réclamation)'),
     contexte: z.string().describe('Résumé complet des échanges précédents')
   }),
   func: async ({ conversationId, telephone, raison, contexte }) => {
@@ -373,7 +423,7 @@ export const escalateToHumanTool = new DynamicStructuredTool({
       return JSON.stringify({
         escalade_enregistree: true,
         ticket_id: res.rows[0].id,
-        message: "Demande transférée avec succès au commerçant. L'humain prendra le relais sans que le client ait à se répéter."
+        message: "Demande transférée avec succès au commerçant humain."
       });
     } catch (err: any) {
       return JSON.stringify({ erreur: true, message: err.message });
@@ -383,7 +433,6 @@ export const escalateToHumanTool = new DynamicStructuredTool({
 
 /**
  * 7. Outil FAQ Boutique
- * Fournit les réponses officielles fixes issues de faq-boutique.md.
  */
 export const getBoutiqueFaqTool = new DynamicStructuredTool({
   name: 'get_boutique_faq',

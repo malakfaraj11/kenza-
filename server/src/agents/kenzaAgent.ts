@@ -1,9 +1,14 @@
 import { ChatOpenAI } from '@langchain/openai';
+import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
 import { ToolNode } from '@langchain/langgraph/prebuilt';
 import { BaseMessage, SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import dotenv from 'dotenv';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import {
   searchCatalogueTool,
@@ -28,17 +33,20 @@ export const tools = [
   getBoutiqueFaqTool
 ];
 
-// 2. Initialisation du modèle LLM
-const llm = new ChatOpenAI({
+// 2. Initialisation des modèles LLM (OpenAI + Gemini)
+const primaryKey = process.env.OPENAI_API_KEY;
+const backupKey = process.env.OPENAI_API_KEY_BACKUP;
+const geminiKey = process.env.GEMINI_API_KEY;
+
+// GPT-4.1 / GPT-5.5 (Rédacteur Commercial - Azure OpenAI)
+const writerLLM = new ChatOpenAI({
   modelName: process.env.LLM_MODEL || 'gpt-4o-mini',
-  temperature: 0.2, // Température basse pour une fidélité stricte et zéro hallucination
-  apiKey: process.env.OPENAI_API_KEY,
+  temperature: 1, // Exigé par ce modèle spécifique sur Azure
+  apiKey: primaryKey,
   configuration: {
     baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
   }
 });
-
-const modelWithTools = llm.bindTools(tools);
 
 // 3. Définition de l'état du Graphe (LangGraph State)
 export const AgentState = Annotation.Root({
@@ -56,86 +64,161 @@ export const AgentState = Annotation.Root({
   }),
 });
 
-// 4. Prompt Système Zéro-Hallucination & Multilingue (Darija / Français / Arabe)
-const SYSTEM_PROMPT = `Tu es Kenza, la conseillère commerciale autonome de notre boutique marocaine sur WhatsApp.
-Ton rôle est de conseiller les clients, vérifier les stocks réels, calculer les frais de livraison, finaliser leurs commandes et escalader vers l'humain si nécessaire.
+// 4. Prompts Spécialisés pour chaque Agent
+const ROUTER_PROMPT = `Tu es l'Extracteur/Routeur (Google Gemini 1.5 Flash).
+Ton seul rôle est d'analyser le message du client en Darija/Français/Arabe et d'appeler les outils nécessaires (recherche catalogue, calcul remise, historique, livraison).
+Si aucun outil n'est nécessaire (ex: le client dit juste "salam"), réponds simplement "CONTINUE".
+N'écris jamais de réponse commerciale au client.`;
 
-### 🇲🇦 RÈGLES DE LANGUE (Exigence EX-08)
-- Tu t'adaptes AUTOMATIQUEMENT à la langue du client :
-  * Si le client s'exprime en Darija (en lettres latines/arabizi ou en arabe, ex: "salam, chhal taman ?", "kayn tawsil ?"), tu réponds en DARIJA marocain naturel, chaleureux et professionnel.
-  * Si le client s'exprime en Français, tu réponds en Français impeccable.
-  * Si le client s'exprime en Arabe standard, tu réponds en Arabe.
-- Tes réponses doivent être concises, directes et adaptées au format WhatsApp (pas de pavés de texte inutiles).
+const WRITER_PROMPT = `Tu es Kenza, la conseillère commerciale d'une boutique marocaine de mode et accessoires haut de gamme. (Modèle: Azure OpenAI).
 
-### 🛡️ RÈGLES D'OR ZERO-HALLUCINATION & CONFORMITÉ MÉTIER
-1. **PRIX ET STOCKS RÉELS (EX-02)** :
-   - N'invente JAMAIS un prix ou une quantité en stock.
-   - Appelle TOUJOURS l'outil 'search_catalogue' pour vérifier l'article, son prix exact (ou promo) et sa disponibilité.
-   - Si le stock est à 0 (rupture), annonce-le poliment et propose les alternatives retournées par l'outil.
-   - INTERDICTION FORMELLE de donner ou promettre une date de réassort (cette décision relève du commerçant).
+⚠️ DIRECTIVE DE LANGUE CRITIQUE & ABSOLUE :
+- Tu dois TOUJOURS répondre en Darija marocaine écrite EXCLUSIVEMENT en LETTRES LATINES (Arabizi / Franco-Arabe).
+- Exemples de Darija acceptée : "Salam labas 3lik!", "3ndna caftan beige b 1580 DH f taille L", "Chnou loun li bghiti?", "Merhba bik f boutique Kenza!".
+- IL EST FORMELLEMENT ET TOTALEMENT INTERDIT D'ÉCRIRE EN LETTRES OU ALPHABET ARABE (أ, ب, ت, ث, ج, ح, خ, د, ...). ZÉRO CARACTÈRE ARABE AUTORISÉ !
+- Si le client parle en Darija (lettres arabes ou latines), TU RÉPONDS STRICTEMENT EN ARABIZI (LETTRES LATINES + chiffres marocains 3, 7, 9).
+- Si le client parle en français, tu réponds en français.
 
-2. **LIVRAISON PAR VILLE** :
-   - Appelle TOUJOURS l'outil 'check_shipping' pour obtenir les frais et délais.
-   - Si la ville demandée n'est pas dans la grille des 12 villes, déclenche 'escalate_to_human' (n'invente jamais de tarif ou délai).
+RÈGLES COMMERCIALES & ZÉRO-HALLUCINATION :
+- Base-toi TOUJOURS sur les résultats des outils pour donner les vrais prix (en DH / MAD), vrais stocks et vraies tailles.
+- Si un produit est disponible, donne son prix et propose les tailles disponibles.
+- Si un produit est en rupture, dis-le poliment et propose les alternatives disponibles renvoyées par l'outil.
+- N'invente jamais un article qui n'existe pas dans le catalogue.
+- Sois chaleureuse, naturelle, concise et vendeuse.`;
 
-3. **NÉGOCIATION ET REMISES (PLANCHER STRICT DE 10%)** :
-   - Si le client négocie ou demande une remise, appelle l'outil 'calculate_discount'.
-   - La remise maximale autorisée est de 10% maximum.
-   - Si le client demande plus de 10% ou insiste, refuse fermement et propose l'escalade vers le commerçant.
+const VALIDATOR_PROMPT = `Tu es le Validateur Strict Anti-Hallucination & Contrôleur Qualité (Google Gemini).
 
-4. **MÉMOIRE DU CLIENT (EX-04)** :
-   - Tu peux utiliser 'get_client_history' avec le numéro de téléphone pour savoir si le client a déjà commandé et personnaliser l'échange.
+TES RÈGLES DE VALIDATION STRICTES :
+1. ANTI-HALLUCINATION : Vérifie que le message de Kenza ne contient aucun prix ni stock inventé par rapport aux données des outils.
+2. CONTRÔLE DE L'ALPHABET (CRITIQUE) : AUCUN CARACTÈRE EN ALPHABET ARABE N'EST ACCEPTÉ. La réponse doit être 100% en lettres latines (Arabizi pour la Darija, avec chiffres 3, 7, 9). Si le message contient des lettres arabes, tu DOIS le transcrire intégralement en lettres latines (Arabizi).
+3. SORTIE ÉPURÉE : Renvoie UNIQUEMENT la réponse validée prête pour WhatsApp. Aucun préfixe, aucun commentaire.`;
 
-5. **ESCALADE VERS L'HUMAIN (EX-06)** :
-   - Déclenche obligatoirement 'escalate_to_human' dans les cas suivants :
-     * Le client demande une facture au nom de son entreprise / société.
-     * Le client insiste pour un remboursement en espèces (seul l'échange ou l'avoir sous 7j est possible).
-     * Litige, réclamation ou question hors de ton domaine de vente.
-   - Transmets toujours le résumé complet du contexte afin que le client n'ait jamais à se répéter.
+// 5. Les Nœuds du Graphe Multi-Agent
 
-6. **CONFIRMATION DE COMMANDE (EX-03)** :
-   - Pour créer une commande avec 'create_order', assure-toi d'avoir : les articles validés, le nom/téléphone, la ville et l'adresse précise de livraison, ainsi que le mode de paiement.`;
+let geminiQuotaExhausted = false;
 
-// 5. Nœud Agent (Appel du LLM)
-async function callModel(state: typeof AgentState.State) {
+async function routerNode(state: typeof AgentState.State) {
+  console.log("➡️ [Agent] Entrée dans routerNode...");
   const { messages } = state;
-  const conversationMessages = [
-    new SystemMessage(SYSTEM_PROMPT),
-    ...messages
-  ];
+  const conversationMessages = [new SystemMessage(ROUTER_PROMPT), ...messages];
 
-  const response = await modelWithTools.invoke(conversationMessages);
+  if (!geminiQuotaExhausted && geminiKey && geminiKey.trim() !== '') {
+    try {
+      const routerLLM = new ChatGoogleGenerativeAI({
+        model: 'gemini-3.6-flash',
+        temperature: 0,
+        apiKey: geminiKey,
+      }).bindTools(tools);
+      const response = await routerLLM.invoke(conversationMessages);
+      return { messages: [response] };
+    } catch (err: any) {
+      console.warn("⚠️ [Gemini Quota Exceeded] Passage automatique sur OpenAI pour la suite de la session.");
+      geminiQuotaExhausted = true;
+    }
+  }
+
+  const fallbackRouter = writerLLM.bindTools(tools);
+  const response = await fallbackRouter.invoke(conversationMessages);
   return { messages: [response] };
 }
 
-// 6. Condition de transition (Doit-on exécuter un outil ou s'arrêter ?)
-function shouldContinue(state: typeof AgentState.State) {
+async function writerNode(state: typeof AgentState.State) {
+  console.log("➡️ [Agent] Entrée dans writerNode (OpenAI)...");
+  const { messages } = state;
+  const conversationMessages = [new SystemMessage(WRITER_PROMPT), ...messages];
+  const responseText = await writerLLM.invoke(conversationMessages);
+  return { messages: [responseText] };
+}
+
+async function validatorNode(state: typeof AgentState.State) {
+  console.log("➡️ [Agent] Entrée dans validatorNode...");
+  const { messages } = state;
+  const conversationMessages = [
+    new SystemMessage(VALIDATOR_PROMPT),
+    ...messages,
+    new HumanMessage("Valide ce message. Rappel strict: EXCLUSIVEMENT en lettres latines (Arabizi avec 3, 7, 9 pour la Darija), ZÉRO caractère en alphabet arabe.")
+  ];
+
+  if (geminiKey && geminiKey.trim() !== '') {
+    try {
+      const validatorLLM = new ChatGoogleGenerativeAI({
+        model: 'gemini-3.6-flash',
+        temperature: 0,
+        apiKey: geminiKey,
+      });
+      const responseText = await validatorLLM.invoke(conversationMessages);
+      return { messages: [responseText] };
+    } catch (e: any) {
+      console.warn("⚠️ [Gemini API RateLimit] Validation pass-through.");
+      return {};
+    }
+  }
+  return {};
+}
+
+// 6. Logique de Routage Conditionnel
+function shouldContinueFromRouter(state: typeof AgentState.State) {
+  console.log("➡️ [Agent] Évaluation de shouldContinueFromRouter...");
   const { messages } = state;
   const lastMessage = messages[messages.length - 1] as AIMessage;
 
   if (lastMessage?.tool_calls && lastMessage.tool_calls.length > 0) {
-    return 'tools';
+    console.log("🔀 [Route] -> tools");
+    return 'tools'; // Si Gemini Flash a détecté le besoin d'un outil
   }
-  return END;
+  console.log("🔀 [Route] -> writer");
+  return 'writer'; // Sinon, on passe directement à la rédaction
 }
 
-// 7. Assemblage du graphe LangGraph
+// 7. Assemblage final de l'Architecture Multi-LLM
 const workflow = new StateGraph(AgentState)
-  .addNode('agent', callModel)
+  .addNode('router', routerNode)
   .addNode('tools', new ToolNode(tools))
-  .addEdge(START, 'agent')
-  .addConditionalEdges('agent', shouldContinue, {
+  .addNode('writer', writerNode)
+  .addNode('validator', validatorNode)
+  
+  // Le flux: START -> Routeur (Gemini Flash) -> Outils (Optionnel) -> Rédacteur (GPT-4) -> Validateur (Gemini Pro) -> END
+  .addEdge(START, 'router')
+  .addConditionalEdges('router', shouldContinueFromRouter, {
     tools: 'tools',
-    [END]: END,
+    writer: 'writer',
   })
-  .addEdge('tools', 'agent');
+  .addEdge('tools', 'writer')
+  .addEdge('writer', 'validator')
+  .addEdge('validator', END);
 
 export const kenzaAgentGraph = workflow.compile();
 
+export function stringifyMessageContent(content: any): string {
+  if (typeof content === 'string') {
+    return content;
+  }
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => {
+        if (typeof item === 'string') return item;
+        if (item && typeof item === 'object') {
+          if ('text' in item && typeof item.text === 'string') return item.text;
+          if ('content' in item && typeof item.content === 'string') return item.content;
+        }
+        return '';
+      })
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+  if (content && typeof content === 'object') {
+    if ('text' in content && typeof content.text === 'string') return content.text;
+    if ('content' in content && typeof content.content === 'string') return content.content;
+  }
+  return String(content || '');
+}
+
 /**
- * Fonction helper pour faire converser l'agent Kenza
+ * Fonction d'entrée pour discuter avec l'écosystème Kenza
  */
 export async function chatWithKenza(userMessage: string, clientPhone: string = '+212600000000', previousMessages: BaseMessage[] = []) {
+  console.log(`\n💬 [Chat] Nouveau message de ${clientPhone} : "${userMessage}"`);
   const inputMessages = [
     ...previousMessages,
     new HumanMessage(userMessage)
@@ -150,7 +233,7 @@ export async function chatWithKenza(userMessage: string, clientPhone: string = '
   const lastMsg = finalMessages[finalMessages.length - 1];
 
   return {
-    reply: lastMsg.content as string,
+    reply: stringifyMessageContent(lastMsg?.content),
     messages: finalMessages,
   };
 }
