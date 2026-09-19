@@ -188,31 +188,59 @@ export function App() {
           {/* MAIN WORKSPACE CONTENT */}
           <main className="flex-1 flex flex-col overflow-hidden bg-slate-50 relative">
             {/* Header */}
-            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-10 shadow-sm">
+            <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 sm:px-6 z-10 shadow-sm">
               <div className="flex items-center gap-3">
-                <h2 className="text-lg font-bold text-slate-800 capitalize">
+                <h2 className="text-base sm:text-lg font-bold text-slate-800 capitalize truncate">
                   {currentTab === 'stock'
-                    ? 'Gestion du Stock & Catalogue'
+                    ? 'Gestion du Stock'
                     : currentTab === 'whatsapp'
-                    ? 'Connexion WhatsApp par QR Code'
-                    : 'Tableau de bord Vendeur'}
+                    ? 'WhatsApp QR Code'
+                    : 'Tableau de bord'}
                 </h2>
               </div>
 
-              <div className="flex items-center gap-4">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold border border-emerald-200">
+              <div className="flex items-center gap-2 sm:gap-4">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 rounded-full text-xs font-semibold border border-emerald-200">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Agent IA En Ligne
+                  <span className="hidden sm:inline">Agent IA En Ligne</span>
+                  <span className="sm:hidden">IA Active</span>
                 </span>
-
-                <button className="text-slate-400 hover:text-indigo-600 transition p-1">
-                  <Bell className="w-5 h-5" />
-                </button>
               </div>
             </header>
 
+            {/* Mobile Navigation Tabs (visible only on mobile md:hidden) */}
+            <div className="md:hidden bg-slate-900 px-2 py-2 flex items-center justify-around border-b border-slate-800 text-xs font-semibold">
+              <button
+                onClick={() => setCurrentTab('dashboard')}
+                className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition ${
+                  currentTab === 'dashboard' ? 'text-indigo-400 bg-slate-800' : 'text-slate-400'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                <span>Dashboard</span>
+              </button>
+              <button
+                onClick={() => setCurrentTab('stock')}
+                className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition ${
+                  currentTab === 'stock' ? 'text-indigo-400 bg-slate-800' : 'text-slate-400'
+                }`}
+              >
+                <Package className="w-4 h-4" />
+                <span>Stock</span>
+              </button>
+              <button
+                onClick={() => setCurrentTab('whatsapp')}
+                className={`flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition ${
+                  currentTab === 'whatsapp' ? 'text-indigo-400 bg-slate-800' : 'text-slate-400'
+                }`}
+              >
+                <MessageCircle className="w-4 h-4" />
+                <span>WhatsApp QR</span>
+              </button>
+            </div>
+
             {/* Scrollable Body */}
-            <div className="flex-1 overflow-auto p-6 sm:p-8">
+            <div className="flex-1 overflow-auto p-4 sm:p-8">
               {currentTab === 'dashboard' && <MerchantDashboard />}
               {currentTab === 'stock' && <CatalogueView />}
               {currentTab === 'whatsapp' && <WhatsAppConnectionView />}
