@@ -177,12 +177,6 @@ export function WhatsAppConnectionView() {
                 >
                   Annuler
                 </button>
-                <button
-                  onClick={simulateScanSuccess}
-                  className="w-full sm:w-auto px-5 py-2 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition text-xs"
-                >
-                  (Simulation : Valider le Scan)
-                </button>
               </div>
             </div>
           )}
