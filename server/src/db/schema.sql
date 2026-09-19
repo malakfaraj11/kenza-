@@ -86,3 +86,13 @@ CREATE TABLE IF NOT EXISTS escalades (
   statut VARCHAR(50) DEFAULT 'en_attente',
   cree_le TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 8. Table Relances Log : Historique des relances automatiques envoyées aux clients inactifs
+CREATE TABLE IF NOT EXISTS relances_log (
+  id SERIAL PRIMARY KEY,
+  telephone VARCHAR(100) NOT NULL,
+  message_relance TEXT NOT NULL,
+  canal VARCHAR(50) DEFAULT 'whatsapp',
+  statut VARCHAR(50) DEFAULT 'envoyée',
+  cree_le TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);

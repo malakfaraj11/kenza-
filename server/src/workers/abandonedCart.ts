@@ -1,6 +1,7 @@
 import { Queue, Worker } from 'bullmq';
 import { chatWithKenza } from '../agents/kenzaAgent.js';
 import { relanceSettings } from '../index.js';
+import { query } from '../db/connection.js';
 
 // Connexion Redis
 const connection = {
@@ -39,16 +40,20 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
 
     try {
       const response = await chatWithKenza(systemPrompt, phone, history);
-      conversationHistories.set(phone, response.messages);
+      // Préserver un historique propre sans le prompt système
+      const aiReplyMsg = response.messages[response.messages.length - 1];
+      if (aiReplyMsg) {
+        conversationHistories.set(phone, [...history, aiReplyMsg]);
+      }
 
       const apiUrl = process.env.EVOLUTION_API_URL || 'http://localhost:8080';
       const apiKey = process.env.EVOLUTION_API_KEY || 'kenza-secret-api-key-2026';
       const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'kenza-bot';
+      const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
 
-      if (apiUrl && apiKey && instanceName) {
+      if (apiUrl && apiKey && instanceName && messageText) {
         try {
           const targetNumber = phone;
-          const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
           
           const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
             method: 'POST',
@@ -66,14 +71,22 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
           const evoData = await evoRes.json().catch(() => ({})) as any;
           if (evoRes.ok) {
             console.log(`✅ [BullMQ] Relance WhatsApp envoyée avec succès à ${targetNumber}`);
+            await query(
+              `INSERT INTO relances_log (telephone, message_relance, canal, statut) VALUES ($1, $2, $3, $4)`,
+              [targetNumber, messageText, 'whatsapp', 'envoyée']
+            ).catch(err => console.error('Erreur insertion relances_log:', err));
           } else {
             console.error(`❌ [BullMQ Erreur WhatsApp] Code HTTP ${evoRes.status} de Evolution API:`, JSON.stringify(evoData));
           }
         } catch (evoErr) {
           console.error(`⚠️ [BullMQ] Erreur envoi WhatsApp:`, evoErr);
         }
-      } else {
+      } else if (messageText) {
         console.log(`✅ [BullMQ] Relance Web générée pour ${phone} : "${response.reply}"`);
+        await query(
+          `INSERT INTO relances_log (telephone, message_relance, canal, statut) VALUES ($1, $2, $3, $4)`,
+          [phone, messageText, 'web', 'envoyée']
+        ).catch(err => console.error('Erreur insertion relances_log:', err));
       }
     } catch (err) {
       console.error(`❌ [BullMQ] Erreur lors de la génération de la relance:`, err);

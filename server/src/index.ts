@@ -76,6 +76,64 @@ fastify.post('/api/settings/relance', async (request, reply) => {
 });
 
 /**
+ * 1.2. Statut du Tracking en direct des Clients Inactifs (BullMQ + Base de données)
+ */
+fastify.get('/api/tracking/status', async () => {
+  try {
+    const delayed = await abandonedCartQueue.getDelayed();
+    const waiting = await abandonedCartQueue.getWaiting();
+    const active = await abandonedCartQueue.getActive();
+
+    const trackedClients = delayed.map(job => {
+      const remainingMs = Math.max(0, (job.timestamp + (job.opts?.delay || 0)) - Date.now());
+      return {
+        jobId: job.id,
+        phone: job.data?.phone,
+        totalDelayMinutes: Math.round((job.opts?.delay || 0) / 60000),
+        remainingSeconds: Math.round(remainingMs / 1000),
+        createdAt: new Date(job.timestamp).toISOString(),
+      };
+    });
+
+    const recentRelancesRes = await query(`
+      SELECT id, telephone, message_relance, canal, statut, cree_le
+      FROM relances_log
+      ORDER BY cree_le DESC
+      LIMIT 10;
+    `).catch(() => ({ rows: [] }));
+
+    return {
+      enabled: relanceSettings.enabled,
+      delayMinutes: relanceSettings.delayMinutes,
+      activeTrackingCount: trackedClients.length,
+      trackedClients,
+      recentRelances: recentRelancesRes.rows,
+      queueStats: {
+        delayed: delayed.length,
+        waiting: waiting.length,
+        active: active.length,
+      }
+    };
+  } catch (err: any) {
+    return {
+      enabled: relanceSettings.enabled,
+      delayMinutes: relanceSettings.delayMinutes,
+      activeTrackingCount: 0,
+      trackedClients: [],
+      recentRelances: [],
+      error: err.message
+    };
+  }
+});
+
+fastify.post('/api/tracking/trigger-test', async (request, reply) => {
+  const body = request.body as { phone?: string };
+  const phone = body?.phone || '+212600000000';
+  await abandonedCartQueue.add('followup', { phone }, { delay: 1000, removeOnComplete: true });
+  return { success: true, message: `Relance test immédiate programmée pour ${phone}` };
+});
+
+/**
  * 1.5. Route de synchronisation pour le simulateur web (Polling)
  */
 fastify.get('/api/chat/sync', async (request, reply) => {
@@ -116,6 +174,7 @@ fastify.post('/api/chat', async (request, reply) => {
     if (hasOrder || !relanceSettings.enabled) {
       await abandonedCartQueue.remove(phone).catch(() => {});
     } else {
+      await abandonedCartQueue.remove(phone).catch(() => {});
       const delayMs = Math.max(1, relanceSettings.delayMinutes) * 60 * 1000;
       console.log(`⏱️ [Relance] Programmation relance pour ${phone} dans ${relanceSettings.delayMinutes} minute(s)...`);
       await abandonedCartQueue.add('followup', { phone }, { delay: delayMs, jobId: phone, removeOnComplete: true });
@@ -181,6 +240,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     if (hasOrder || !relanceSettings.enabled) {
       await abandonedCartQueue.remove(remoteJid).catch(() => {});
     } else {
+      await abandonedCartQueue.remove(remoteJid).catch(() => {});
       const delayMs = Math.max(1, relanceSettings.delayMinutes) * 60 * 1000;
       console.log(`⏱️ [Relance WhatsApp] Programmation relance pour ${remoteJid} dans ${relanceSettings.delayMinutes} minute(s)...`);
       await abandonedCartQueue.add('followup', { phone: remoteJid }, { delay: delayMs, jobId: remoteJid, removeOnComplete: true });
