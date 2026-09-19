@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="fr" class="bg-gray-50 antialiased">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenza AI - Espace Vendeur</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Alpine.js for interactivity -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.3/dist/cdn.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#4f46e5', // Indigo 600
+                        primaryHover: '#4338ca', // Indigo 700
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+<body x-data="appData()" class="text-gray-900 font-sans h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- AUTHENTICATION VIEW -->
+    <div x-show="!isAuthenticated" x-cloak class="absolute inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-indigo-50 to-blue-100 p-4">
+        <div class="glass-panel w-full max-w-md p-8 rounded-2xl shadow-xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-primary to-blue-400"></div>
+            
+            <div class="text-center mb-8 mt-2">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 text-primary mb-4">
+                    <i data-lucide="bot" class="w-6 h-6"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-900">Kenza SaaS</h1>
+                <p class="text-sm text-gray-500 mt-2" x-text="isLogin ? `Connectez-vous à votre espace ${role}` : `Créez votre compte ${role}`"></p>
+            </div>
+
+            <form @submit.prevent="login" class="space-y-5">
+                <!-- Role Selection Toggle -->
+                <div class="flex p-1 bg-gray-100 rounded-lg">
+                    <button type="button" @click="role = 'vendeur'" :class="{'bg-white shadow-sm text-gray-900 font-medium': role === 'vendeur', 'text-gray-500 hover:text-gray-700': role !== 'vendeur'}" class="flex-1 py-1.5 text-sm rounded-md transition flex items-center justify-center gap-2">
+                        <i data-lucide="store" class="w-4 h-4"></i> Vendeur
+                    </button>
+                    <button type="button" @click="role = 'client'" :class="{'bg-white shadow-sm text-gray-900 font-medium': role === 'client', 'text-gray-500 hover:text-gray-700': role !== 'client'}" class="flex-1 py-1.5 text-sm rounded-md transition flex items-center justify-center gap-2">
+                        <i data-lucide="user" class="w-4 h-4"></i> Client
+                    </button>
+                </div>
+
+                <div x-show="!isLogin && role === 'vendeur'">
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Nom de la boutique</label>
+                    <input type="text" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" placeholder="Ma Super Boutique">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                    <input type="email" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" placeholder="vendeur@email.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mot de passe</label>
+                    <input type="password" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition" placeholder="••••••••">
+                </div>
+                
+                <button type="submit" class="w-full bg-primary hover:bg-primaryHover text-white font-medium py-2.5 rounded-lg transition shadow-md shadow-primary/30 flex justify-center items-center gap-2">
+                    <span x-text="isLogin ? 'Se connecter' : 'Créer mon compte'"></span>
+                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </button>
+            </form>
+
+            <div class="mt-6 text-center text-sm">
+                <p class="text-gray-600">
+                    <span x-text="isLogin ? 'Pas encore de compte ?' : 'Déjà un compte ?'"></span>
+                    <button @click="isLogin = !isLogin" class="text-primary font-medium hover:underline ml-1" x-text="isLogin ? 'S\'inscrire' : 'Se connecter'"></button>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP LAYOUT -->
+    <template x-if="isAuthenticated">
+        <div class="flex h-full w-full">
+            
+            <!-- SIDEBAR -->
+            <aside class="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex z-10 shadow-sm">
+                <div class="h-16 flex items-center px-6 border-b border-gray-200">
+                    <div class="flex items-center gap-2 text-primary">
+                        <i data-lucide="bot" class="w-6 h-6"></i>
+                        <span class="font-bold text-lg text-gray-900 tracking-tight">Kenza SaaS</span>
+                    </div>
+                </div>
+                
+                <nav class="flex-1 overflow-y-auto py-4 px-3 space-y-1">
+                    <button @click="currentTab = 'dashboard'" :class="{'bg-primary/10 text-primary font-medium': currentTab === 'dashboard', 'text-gray-600 hover:bg-gray-50': currentTab !== 'dashboard'}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                        Tableau de bord
+                    </button>
+                    <button @click="currentTab = 'stock'" :class="{'bg-primary/10 text-primary font-medium': currentTab === 'stock', 'text-gray-600 hover:bg-gray-50': currentTab !== 'stock'}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left">
+                        <i data-lucide="package" class="w-5 h-5"></i>
+                        Mon Stock
+                    </button>
+                    <button @click="currentTab = 'whatsapp'" :class="{'bg-primary/10 text-primary font-medium': currentTab === 'whatsapp', 'text-gray-600 hover:bg-gray-50': currentTab !== 'whatsapp'}" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-left">
+                        <i data-lucide="message-circle" class="w-5 h-5"></i>
+                        WhatsApp IA
+                    </button>
+                </nav>
+
+                <div class="p-4 border-t border-gray-200">
+                    <div class="flex items-center gap-3 mb-4 px-2">
+                        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-purple-500 text-white flex items-center justify-center font-bold text-sm">
+                            B
+                        </div>
+                        <div class="overflow-hidden">
+                            <p class="text-sm font-medium text-gray-900 truncate">Ma Boutique</p>
+                            <p class="text-xs text-gray-500 truncate">vendeur@email.com</p>
+                        </div>
+                    </div>
+                    <button @click="logout" class="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors text-left">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                        Déconnexion
+                    </button>
+                </div>
+            </aside>
+
+            <!-- CONTENT AREA -->
+            <main class="flex-1 flex flex-col overflow-hidden bg-gray-50/50 relative">
+                
+                <!-- HEADER (Mobile included) -->
+                <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 z-10 shadow-sm">
+                    <div class="flex items-center gap-3 md:hidden">
+                        <button class="text-gray-500 hover:text-gray-700">
+                            <i data-lucide="menu" class="w-6 h-6"></i>
+                        </button>
+                        <span class="font-bold text-gray-900">Kenza SaaS</span>
+                    </div>
+                    
+                    <h2 class="hidden md:block text-xl font-semibold text-gray-800 capitalize" x-text="currentTab === 'stock' ? 'Gestion du Stock' : currentTab === 'whatsapp' ? 'Connexion WhatsApp' : 'Tableau de bord'"></h2>
+
+                    <div class="flex items-center gap-4">
+                        <!-- Status Badge -->
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium" 
+                              :class="waStatus === 'connected' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'">
+                            <span class="w-2 h-2 rounded-full" :class="waStatus === 'connected' ? 'bg-green-500' : 'bg-gray-400'"></span>
+                            <span class="hidden sm:inline" x-text="waStatus === 'connected' ? 'Agent Actif' : 'Agent Inactif'"></span>
+                        </span>
+                        
+                        <button class="text-gray-400 hover:text-primary transition">
+                            <i data-lucide="bell" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </header>
+
+                <!-- SCROLLABLE CONTENT -->
+                <div class="flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+                    
+                    <!-- 1. DASHBOARD TAB -->
+                    <div x-show="currentTab === 'dashboard'" x-transition.opacity.duration.300ms>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                            <!-- Stat Card -->
+                            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Conversations gérées par l'IA</p>
+                                        <h3 class="text-3xl font-bold text-gray-900 mt-2">124</h3>
+                                    </div>
+                                    <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                        <i data-lucide="message-square" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex items-center text-sm">
+                                    <span class="text-green-600 font-medium flex items-center"><i data-lucide="trending-up" class="w-4 h-4 mr-1"></i> +12%</span>
+                                    <span class="text-gray-400 ml-2">cette semaine</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Stat Card -->
+                            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Ventes conclues (IA)</p>
+                                        <h3 class="text-3xl font-bold text-gray-900 mt-2">32</h3>
+                                    </div>
+                                    <div class="p-2 bg-green-50 text-green-600 rounded-lg">
+                                        <i data-lucide="shopping-bag" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex items-center text-sm">
+                                    <span class="text-green-600 font-medium flex items-center"><i data-lucide="trending-up" class="w-4 h-4 mr-1"></i> +5%</span>
+                                    <span class="text-gray-400 ml-2">cette semaine</span>
+                                </div>
+                            </div>
+
+                            <!-- Stat Card -->
+                            <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-500">Produits en stock</p>
+                                        <h3 class="text-3xl font-bold text-gray-900 mt-2" x-text="products.length"></h3>
+                                    </div>
+                                    <div class="p-2 bg-purple-50 text-purple-600 rounded-lg">
+                                        <i data-lucide="package" class="w-6 h-6"></i>
+                                    </div>
+                                </div>
+                                <div class="mt-4 flex items-center text-sm">
+                                    <button @click="currentTab = 'stock'" class="text-primary hover:underline font-medium">Gérer le catalogue &rarr;</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div class="p-6 border-b border-gray-200 flex justify-between items-center">
+                                <h3 class="font-semibold text-gray-900">Activité Récente de l'Agent</h3>
+                                <button class="text-sm text-primary font-medium hover:underline">Voir tout</button>
+                            </div>
+                            <div class="divide-y divide-gray-100">
+                                <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                            <i data-lucide="shopping-cart" class="w-5 h-5"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-900">Commande générée (#CMD-092)</p>
+                                            <p class="text-xs text-gray-500">T-shirt basique (M, Noir) vendu par l'IA</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400">Il y a 10 min</span>
+                                </div>
+                                <div class="p-4 flex items-center justify-between hover:bg-gray-50 transition">
+                                    <div class="flex items-center gap-4">
+                                        <div class="w-10 h-10 rounded-full bg-yellow-100 text-yellow-600 flex items-center justify-center">
+                                            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+                                        </div>
+                                        <div>
+                                            <p class="text-sm font-medium text-gray-900">Demande d'intervention humaine</p>
+                                            <p class="text-xs text-gray-500">Le client demande une facture société</p>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs text-gray-400">Il y a 1h</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. STOCK / CATALOGUE TAB -->
+                    <div x-show="currentTab === 'stock'" x-transition.opacity.duration.300ms x-cloak>
+                        
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                            <div class="relative w-full sm:w-96">
+                                <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"></i>
+                                <input type="text" placeholder="Rechercher un produit..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition">
+                            </div>
+                            <div class="flex items-center gap-3 w-full sm:w-auto">
+                                <button @click="showUploadModal = true" class="flex-1 sm:flex-initial border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg transition shadow-sm flex items-center justify-center gap-2">
+                                    <i data-lucide="file-up" class="w-4 h-4 text-primary"></i>
+                                    Importer des fichiers (CSV, Excel, PDF, MD)
+                                </button>
+                                <button @click="showAddModal = true" class="flex-1 sm:flex-initial bg-primary hover:bg-primaryHover text-white font-medium py-2 px-4 rounded-lg transition shadow-sm flex items-center justify-center gap-2">
+                                    <i data-lucide="plus" class="w-4 h-4"></i>
+                                    Ajouter manuellement
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Product List -->
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+                            <div class="overflow-x-auto">
+                                <table class="w-full text-left text-sm text-gray-600">
+                                    <thead class="bg-gray-50 text-gray-700 uppercase font-semibold text-xs border-b border-gray-200">
+                                        <tr>
+                                            <th class="px-6 py-4">Produit</th>
+                                            <th class="px-6 py-4">Prix</th>
+                                            <th class="px-6 py-4">Catégorie</th>
+                                            <th class="px-6 py-4">Variantes & Stock</th>
+                                            <th class="px-6 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-200">
+                                        <template x-for="product in products" :key="product.id">
+                                            <tr class="hover:bg-gray-50/50 transition">
+                                                <td class="px-6 py-4">
+                                                    <div class="flex items-center gap-3">
+                                                        <div class="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                                                            <template x-if="product.image">
+                                                                <img :src="product.image" class="w-full h-full object-cover">
+                                                            </template>
+                                                            <template x-if="!product.image">
+                                                                <i data-lucide="image" class="w-5 h-5 text-gray-400"></i>
+                                                            </template>
+                                                        </div>
+                                                        <div>
+                                                            <p class="font-medium text-gray-900" x-text="product.name"></p>
+                                                            <p class="text-xs text-gray-500 truncate w-48" x-text="product.description"></p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 font-medium text-gray-900">
+                                                    <span x-text="product.price"></span> MAD
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <span class="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-medium" x-text="product.category"></span>
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <div class="space-y-1">
+                                                        <template x-for="v in product.variants">
+                                                            <div class="text-xs flex items-center justify-between bg-gray-50 px-2 py-1 rounded border border-gray-100 w-32">
+                                                                <span class="font-medium" x-text="`${v.color} - ${v.size}`"></span>
+                                                                <span :class="v.qty > 0 ? 'text-green-600' : 'text-red-500'" x-text="v.qty + ' en stock'"></span>
+                                                            </div>
+                                                        </template>
+                                                    </div>
+                                                </td>
+                                                <td class="px-6 py-4 text-right space-x-2">
+                                                    <button class="text-gray-400 hover:text-primary transition"><i data-lucide="edit-2" class="w-4 h-4"></i></button>
+                                                    <button @click="deleteProduct(product.id)" class="text-gray-400 hover:text-red-500 transition"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                                </td>
+                                            </tr>
+                                        </template>
+                                        <tr x-show="products.length === 0">
+                                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                                                Aucun produit dans votre stock. L'agent IA n'a rien à vendre pour l'instant !
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <!-- 3. WHATSAPP CONNECTION TAB -->
+                    <div x-show="currentTab === 'whatsapp'" x-transition.opacity.duration.300ms x-cloak class="max-w-3xl mx-auto">
+                        
+                        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                            <!-- Header connection -->
+                            <div class="bg-gradient-to-r from-gray-50 to-gray-100 p-8 text-center border-b border-gray-200">
+                                <div class="inline-flex items-center justify-center w-16 h-16 rounded-full mb-4 shadow-sm" :class="waStatus === 'connected' ? 'bg-green-100 text-green-600' : 'bg-white text-gray-400'">
+                                    <i data-lucide="message-circle" class="w-8 h-8"></i>
+                                </div>
+                                <h2 class="text-2xl font-bold text-gray-900 mb-2">Connecter WhatsApp</h2>
+                                <p class="text-gray-500 max-w-lg mx-auto">Reliez votre numéro professionnel pour que l'Agent IA Kenza puisse répondre à vos clients instantanément, 24/7.</p>
+                            </div>
+
+                            <div class="p-8">
+                                
+                                <!-- Status: Disconnected -->
+                                <div x-show="waStatus === 'disconnected'" class="text-center">
+                                    <div class="bg-blue-50 border border-blue-100 text-blue-800 rounded-lg p-4 mb-8 text-sm text-left">
+                                        <h4 class="font-bold flex items-center gap-2 mb-1"><i data-lucide="info" class="w-4 h-4"></i> Comment ça marche ?</h4>
+                                        <ol class="list-decimal ml-5 space-y-1 text-blue-700">
+                                            <li>Cliquez sur "Générer le QR Code" ci-dessous.</li>
+                                            <li>Ouvrez WhatsApp sur votre téléphone.</li>
+                                            <li>Allez dans Paramètres > Appareils connectés > Connecter un appareil.</li>
+                                            <li>Scannez le QR code affiché à l'écran.</li>
+                                        </ol>
+                                    </div>
+                                    <button @click="generateQR()" class="bg-primary hover:bg-primaryHover text-white font-medium py-3 px-8 rounded-xl transition shadow-md shadow-primary/20 flex items-center justify-center gap-2 mx-auto">
+                                        <i data-lucide="qr-code" class="w-5 h-5"></i>
+                                        Générer le QR Code
+                                    </button>
+                                </div>
+
+                                <!-- Status: Pending Scan -->
+                                <div x-show="waStatus === 'pending'" class="flex flex-col items-center">
+                                    <p class="font-medium text-gray-900 mb-6">Scannez ce QR code avec WhatsApp</p>
+                                    <div class="p-4 border-2 border-gray-100 rounded-2xl bg-white shadow-sm mb-6 relative group">
+                                        <!-- Fake QR Code Image (Placeholder) -->
+                                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=kenza-ai-auth-token-mockup" alt="QR Code" class="w-64 h-64 opacity-90 transition group-hover:opacity-100">
+                                        
+                                        <!-- Scanner animation effect overlay -->
+                                        <div class="absolute inset-0 border-4 border-primary/30 rounded-2xl overflow-hidden pointer-events-none">
+                                            <div class="w-full h-1 bg-primary/50 absolute top-0 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-[scan_2s_ease-in-out_infinite]"></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="flex items-center gap-2 text-sm text-gray-500 mb-8 animate-pulse">
+                                        <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> En attente du scan...
+                                    </div>
+
+                                    <div class="flex gap-4">
+                                        <button @click="waStatus = 'disconnected'" class="px-6 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 transition">Annuler</button>
+                                        <button @click="simulateConnection()" class="px-6 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition text-sm">(Simulation: Forcer connexion)</button>
+                                    </div>
+                                </div>
+
+                                <!-- Status: Connected -->
+                                <div x-show="waStatus === 'connected'" class="text-center">
+                                    <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-green-50 text-green-500 mb-6 border-4 border-green-100">
+                                        <i data-lucide="check" class="w-10 h-10"></i>
+                                    </div>
+                                    <h3 class="text-xl font-bold text-gray-900 mb-2">Agent Connecté et Actif</h3>
+                                    <p class="text-gray-500 mb-8">L'Agent IA répond désormais automatiquement sur le numéro <strong>+212 6 XX XX XX XX</strong> en se basant sur votre stock.</p>
+                                    
+                                    <div class="bg-gray-50 rounded-xl p-6 mb-8 text-left border border-gray-200">
+                                        <h4 class="font-medium text-gray-900 mb-4 border-b border-gray-200 pb-2">Paramètres de l'Agent</h4>
+                                        <div class="space-y-4">
+                                            <label class="flex items-center gap-3">
+                                                <input type="checkbox" checked class="w-5 h-5 text-primary rounded border-gray-300 focus:ring-primary accent-primary">
+                                                <span class="text-sm text-gray-700">Autoriser l'IA à proposer des alternatives en cas de rupture</span>
+                                            </label>
+                                            <label class="flex items-center gap-3">
+                                                <input type="checkbox" checked class="w-5 h-5 text-primary rounded border-gray-300 focus:ring-primary accent-primary">
+                                                <span class="text-sm text-gray-700">Parler en Darija / Français mixte (Recommandé)</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <button @click="waStatus = 'disconnected'" class="bg-white border-2 border-red-100 text-red-600 hover:bg-red-50 font-medium py-2.5 px-6 rounded-lg transition">
+                                        Déconnecter le numéro
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </main>
+        </div>
+    </template>
+
+    <!-- MODAL: IMPORT FILES / DOSSIER -->
+    <div x-show="showUploadModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" @click="showUploadModal = false"></div>
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
+            
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                    <h3 class="text-lg font-bold text-gray-900">Importer des sources de données pour l'IA</h3>
+                    <p class="text-xs text-gray-500">Formats supportés : CSV, XLSX, PDF, TXT, MD (ex: sujet-02-kenza)</p>
+                </div>
+                <button @click="showUploadModal = false" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="p-6 space-y-6 overflow-y-auto flex-1">
+                <!-- Dropzone -->
+                <div class="border-2 border-dashed border-gray-300 hover:border-primary rounded-xl p-8 text-center bg-gray-50 hover:bg-indigo-50/30 transition cursor-pointer flex flex-col items-center justify-center">
+                    <div class="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-3">
+                        <i data-lucide="folder-up" class="w-6 h-6"></i>
+                    </div>
+                    <p class="font-medium text-gray-900 text-sm">Glissez-déposez vos fichiers ou dossiers ici</p>
+                    <p class="text-xs text-gray-500 mt-1">Catalogue.csv, Promotions.csv, FAQ-boutique.md, PDF de tarifs, etc.</p>
+                    <input type="file" multiple class="hidden" id="fileInput" @change="handleFileSelect">
+                    <button type="button" onclick="document.getElementById('fileInput').click()" class="mt-4 px-4 py-2 bg-white border border-gray-300 rounded-lg text-xs font-medium text-gray-700 shadow-sm hover:bg-gray-50">Parcourir les fichiers</button>
+                </div>
+
+                <!-- Shortcut for sujet-02-kenza dataset -->
+                <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 rounded-lg bg-primary text-white flex items-center justify-center font-bold text-xs">
+                            ZIP
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-900">Importer le dossier <code class="bg-white px-1.5 py-0.5 rounded border border-indigo-200 text-primary text-xs">sujet-02-kenza</code></p>
+                            <p class="text-xs text-gray-600">Importe automatiquement catalogue.csv (80 articles), promotions, clients et FAQ.</p>
+                        </div>
+                    </div>
+                    <button type="button" @click="importFolderData()" class="px-4 py-2 bg-primary hover:bg-primaryHover text-white text-xs font-medium rounded-lg shadow-sm transition flex items-center gap-1.5 flex-shrink-0">
+                        <i data-lucide="download-cloud" class="w-4 h-4"></i>
+                        Charger le dossier
+                    </button>
+                </div>
+
+                <!-- List of imported reference files -->
+                <div>
+                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Fichiers de référence actifs (<span x-text="importedFiles.length"></span>)</h4>
+                    <div class="space-y-2">
+                        <template x-for="file in importedFiles" :key="file.name">
+                            <div class="flex items-center justify-between p-3 bg-white border border-gray-200 rounded-lg text-xs">
+                                <div class="flex items-center gap-3">
+                                    <i data-lucide="file-text" class="w-4 h-4 text-gray-400"></i>
+                                    <div>
+                                        <p class="font-medium text-gray-900" x-text="file.name"></p>
+                                        <p class="text-gray-400 text-[10px]" x-text="`${file.size} • ${file.type}`"></p>
+                                    </div>
+                                </div>
+                                <span class="px-2 py-0.5 bg-green-100 text-green-700 font-medium rounded text-[10px] flex items-center gap-1">
+                                    <i data-lucide="check-circle" class="w-3 h-3"></i> Indexé pour l'IA
+                                </span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+                <button @click="showUploadModal = false" class="px-5 py-2 bg-primary text-white font-medium text-sm rounded-lg shadow-sm hover:bg-primaryHover transition">Fermer</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD PRODUCT -->
+    <div x-show="showAddModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center">
+        <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-sm" @click="showAddModal = false"></div>
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl relative z-10 flex flex-col max-h-[90vh]">
+            
+            <div class="flex items-center justify-between p-6 border-b border-gray-200">
+                <h3 class="text-lg font-bold text-gray-900">Ajouter un produit</h3>
+                <button @click="showAddModal = false" class="text-gray-400 hover:text-gray-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+            
+            <div class="p-6 overflow-y-auto flex-1">
+                <form id="addProductForm" @submit.prevent="saveProduct" class="space-y-6">
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Nom du produit *</label>
+                                <input type="text" x-model="newProduct.name" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Prix (MAD) *</label>
+                                <input type="number" x-model="newProduct.price" required class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
+                                <input type="text" x-model="newProduct.category" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none" placeholder="ex: Vêtements">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Photo (Optionnelle)</label>
+                            <div class="border-2 border-dashed border-gray-300 rounded-xl h-32 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-primary cursor-pointer transition">
+                                <i data-lucide="upload-cloud" class="w-8 h-8 mb-2"></i>
+                                <span class="text-xs font-medium">Cliquez pour uploader</span>
+                            </div>
+                            <div class="mt-4">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Description courte</label>
+                                <textarea x-model="newProduct.description" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary outline-none resize-none h-20" placeholder="Matière, coupe..."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Variants Section -->
+                    <div class="border-t border-gray-200 pt-6">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="font-medium text-gray-900">Variantes et Stock *</h4>
+                            <button type="button" @click="addVariantRow()" class="text-sm text-primary font-medium flex items-center hover:underline"><i data-lucide="plus" class="w-4 h-4 mr-1"></i> Ajouter une variante</button>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <template x-for="(variant, index) in newProduct.variants" :key="index">
+                                <div class="flex items-center gap-3">
+                                    <input type="text" x-model="variant.color" placeholder="Couleur (ex: Noir)" required class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                    <input type="text" x-model="variant.size" placeholder="Taille (ex: M)" required class="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                    <input type="number" x-model="variant.qty" placeholder="Qté" required class="w-24 px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                                    <button type="button" @click="removeVariantRow(index)" class="text-gray-400 hover:text-red-500 p-2"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+                <button @click="showAddModal = false" class="px-5 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-100 transition">Annuler</button>
+                <button @click="saveProduct" class="px-5 py-2 bg-primary hover:bg-primaryHover text-white font-medium rounded-lg shadow-sm transition flex items-center gap-2">
+                    <i data-lucide="save" class="w-4 h-4"></i>
+                    Enregistrer le produit
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Custom CSS Animations -->
+    <style>
+        @keyframes scan {
+            0% { top: 0; }
+            50% { top: 100%; }
+            100% { top: 0; }
+        }
+    </style>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // Alpine.js Application Logic
+        function appData() {
+            return {
+                isAuthenticated: false,
+                isLogin: true,
+                role: 'vendeur', // 'vendeur' or 'client'
+                currentTab: 'dashboard', // dashboard, stock, whatsapp
+                waStatus: 'disconnected', // disconnected, pending, connected
+                showAddModal: false,
+                showUploadModal: false,
+                
+                importedFiles: [
+                    { name: 'catalogue.csv', size: '14 KB', type: '80 références produits & stocks' },
+                    { name: 'promotions.csv', size: '2 KB', type: 'Remises actives temporaires' },
+                    { name: 'faq-boutique.md', size: '5 KB', type: 'Politique livraison, horaires & retours' }
+                ],
+                
+                // Mock Data for Stock
+                products: [
+                    {
+                        id: 1,
+                        name: 'T-shirt Basique Oversize',
+                        price: 150,
+                        category: 'Vêtements',
+                        description: '100% Coton épais, coupe large',
+                        image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=150&q=80',
+                        variants: [
+                            { color: 'Blanc', size: 'S', qty: 5 },
+                            { color: 'Blanc', size: 'M', qty: 12 },
+                            { color: 'Noir', size: 'M', qty: 0 },
+                            { color: 'Noir', size: 'L', qty: 3 }
+                        ]
+                    },
+                    {
+                        id: 2,
+                        name: 'Casquette Vintage',
+                        price: 99,
+                        category: 'Accessoires',
+                        description: 'Logo brodé',
+                        image: null,
+                        variants: [
+                            { color: 'Beige', size: 'Unique', qty: 20 },
+                            { color: 'Vert', size: 'Unique', qty: 8 }
+                        ]
+                    }
+                ],
+
+                // New Product Form State
+                newProduct: {
+                    name: '',
+                    price: '',
+                    category: '',
+                    description: '',
+                    variants: [ { color: '', size: '', qty: '' } ]
+                },
+
+                // Methods
+                login() {
+                    // Simulate authentication
+                    this.isAuthenticated = true;
+                    setTimeout(() => lucide.createIcons(), 50); // re-init icons for new view
+                },
+                logout() {
+                    this.isAuthenticated = false;
+                    this.waStatus = 'disconnected';
+                    this.currentTab = 'dashboard';
+                },
+                generateQR() {
+                    this.waStatus = 'pending';
+                },
+                simulateConnection() {
+                    this.waStatus = 'connected';
+                },
+                addVariantRow() {
+                    this.newProduct.variants.push({ color: '', size: '', qty: '' });
+                },
+                removeVariantRow(index) {
+                    if (this.newProduct.variants.length > 1) {
+                        this.newProduct.variants.splice(index, 1);
+                    }
+                },
+                importFolderData() {
+                    // Simulate loading the sujet-02-kenza dataset into the products table
+                    this.products = [
+                        {
+                            id: 101,
+                            name: 'Djellaba Moderne Soie',
+                            price: 850,
+                            category: 'Femme',
+                            description: 'Réf: DJEL-001 • Matiere: Soie • Couleur: Vert',
+                            image: null,
+                            variants: [
+                                { color: 'Vert', size: 'M', qty: 15 },
+                                { color: 'Vert', size: 'L', qty: 8 }
+                            ]
+                        },
+                        {
+                            id: 102,
+                            name: 'Caftan Brodé Doré',
+                            price: 1580,
+                            category: 'Femme',
+                            description: 'Réf: CAF-042 • Matiere: Velours • Saison: 2026',
+                            image: null,
+                            variants: [
+                                { color: 'Beige', size: 'L', qty: 5 },
+                                { color: 'Rouge', size: 'M', qty: 0 }
+                            ]
+                        },
+                        {
+                            id: 103,
+                            name: 'Babouches Cuir Véritable',
+                            price: 250,
+                            category: 'Chaussures',
+                            description: 'Réf: BAB-010 • Artisanat Fès',
+                            image: null,
+                            variants: [
+                                { color: 'Marron', size: '42', qty: 10 },
+                                { color: 'Noir', size: '41', qty: 4 }
+                            ]
+                        },
+                        ...this.products
+                    ];
+                    alert("✅ Dossier 'sujet-02-kenza' importé et indexé avec succès ! Les 80 articles du catalogue, les promotions et la FAQ ont été chargés pour l'agent IA.");
+                    this.showUploadModal = false;
+                    setTimeout(() => lucide.createIcons(), 50);
+                },
+                handleFileSelect(e) {
+                    const files = e.target.files;
+                    if(files && files.length > 0) {
+                        for(let f of files) {
+                            this.importedFiles.push({
+                                name: f.name,
+                                size: (f.size / 1024).toFixed(1) + ' KB',
+                                type: 'Document indexé pour l\'IA'
+                            });
+                        }
+                        alert(`✅ ${files.length} fichier(s) importé(s) et indexé(s) pour l'Agent IA !`);
+                    }
+                },
+                saveProduct() {
+                    if(!this.newProduct.name || !this.newProduct.price) return alert("Veuillez remplir le nom et le prix.");
+                    
+                    this.products.unshift({
+                        id: Date.now(),
+                        name: this.newProduct.name,
+                        price: parseFloat(this.newProduct.price),
+                        category: this.newProduct.category || 'Non classé',
+                        description: this.newProduct.description,
+                        image: null, // mock
+                        variants: JSON.parse(JSON.stringify(this.newProduct.variants)).map(v => ({...v, qty: parseInt(v.qty) || 0}))
+                    });
+
+                    // Reset form & close
+                    this.newProduct = { name: '', price: '', category: '', description: '', variants: [ { color: '', size: '', qty: '' } ] };
+                    this.showAddModal = false;
+                    setTimeout(() => lucide.createIcons(), 50);
+                }
+            }
+        }
+    </script>
+</body>
+</html>
