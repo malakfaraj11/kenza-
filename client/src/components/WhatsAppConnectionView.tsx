@@ -108,14 +108,14 @@ export function WhatsAppConnectionView() {
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Main Connection Box */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-8 text-white text-center relative overflow-hidden">
+        <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-5 sm:p-8 text-white text-center relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none"></div>
           
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-md mb-4 border border-white/20 shadow-inner">
-            <MessageCircle className="w-8 h-8 text-emerald-400" />
+          <div className="inline-flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/10 backdrop-blur-md mb-3 sm:mb-4 border border-white/20 shadow-inner">
+            <MessageCircle className="w-7 h-7 sm:w-8 sm:h-8 text-emerald-400" />
           </div>
-          <h2 className="text-2xl font-bold mb-2">Connexion WhatsApp (Evolution API)</h2>
-          <p className="text-indigo-200 max-w-lg mx-auto text-sm">
+          <h2 className="text-xl sm:text-2xl font-bold mb-2">Connexion WhatsApp (Evolution API)</h2>
+          <p className="text-indigo-200 max-w-lg mx-auto text-xs sm:text-sm leading-relaxed">
             Reliez votre numéro de téléphone professionnel pour que l'Agent IA Kenza réponde à vos clients 24/7 en fonction de votre stock.
           </p>
         </div>
@@ -252,15 +252,15 @@ export function WhatsAppConnectionView() {
       </div>
 
       {/* CARD: RELANCE & TRACKING CLIENTS INACTIFS */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 sm:p-6 space-y-5 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 border-b border-gray-100 pb-4">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0">
               <Clock className="w-5 h-5 text-indigo-600" />
             </div>
             <div>
-              <h3 className="font-bold text-gray-900 text-base">Tracking &amp; Relance Automatique des Clients Inactifs</h3>
-              <p className="text-xs text-gray-500">L'IA envoie un message de suivi personnalisé si le client ne répond pas après le délai choisi (annulé dès réponse client).</p>
+              <h3 className="font-bold text-gray-900 text-sm sm:text-base">Tracking &amp; Relance Automatique des Clients Inactifs</h3>
+              <p className="text-[11px] sm:text-xs text-gray-500 leading-relaxed">L'IA envoie un message de suivi personnalisé si le client ne répond pas après le délai choisi (annulé dès réponse client).</p>
             </div>
           </div>
           <span className={`px-3 py-1 rounded-full text-xs font-semibold self-start sm:self-auto ${relanceEnabled ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-gray-100 text-gray-500'}`}>
@@ -271,12 +271,12 @@ export function WhatsAppConnectionView() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-4">
             <label className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-200 cursor-pointer hover:bg-gray-100/60 transition">
-              <span className="text-sm font-semibold text-gray-900">Activer le message de suivi / relance</span>
+              <span className="text-xs sm:text-sm font-semibold text-gray-900">Activer le message de suivi / relance</span>
               <input
                 type="checkbox"
                 checked={relanceEnabled}
                 onChange={(e) => setRelanceEnabled(e.target.checked)}
-                className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                className="w-5 h-5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 flex-shrink-0"
               />
             </label>
 
@@ -284,20 +284,20 @@ export function WhatsAppConnectionView() {
               <label className="block text-xs font-bold text-gray-700 mb-1.5">
                 Délai d'inactivité avant relance (en minutes) *
               </label>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="number"
                   min="1"
                   max="1440"
                   value={relanceDelayMinutes}
                   onChange={(e) => setRelanceDelayMinutes(parseInt(e.target.value, 10) || 1)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none"
+                  className="w-full sm:flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm font-semibold focus:ring-2 focus:ring-indigo-500 outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleSaveRelanceSettings}
                   disabled={savingSettings}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition shadow-sm flex items-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg text-xs transition shadow-sm flex items-center justify-center gap-2"
                 >
                   {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   Enregistrer
