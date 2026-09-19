@@ -7,7 +7,7 @@ import { WhatsAppConnectionView } from './components/WhatsAppConnectionView.js';
 export function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoginView, setIsLoginView] = useState(true);
-  const [currentTab, setCurrentTab] = useState<'dashboard' | 'stock' | 'whatsapp'>('dashboard');
+  const [currentTab, setCurrentTab] = useState<'dashboard' | 'stock' | 'whatsapp'>('whatsapp');
 
   // Vendor Account Form State
   const [vendorAuth, setVendorAuth] = useState({
@@ -19,11 +19,12 @@ export function App() {
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticated(true);
+    setCurrentTab('whatsapp');
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
-    setCurrentTab('dashboard');
+    setCurrentTab('whatsapp');
   };
 
   return (
