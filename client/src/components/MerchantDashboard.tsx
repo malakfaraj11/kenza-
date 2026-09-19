@@ -70,6 +70,7 @@ export function MerchantDashboard() {
   const [selectedEscalade, setSelectedEscalade] = useState<any | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<'today' | 'all'>('today');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
@@ -186,6 +187,9 @@ export function MerchantDashboard() {
 
   // Filtrage des commandes
   const filteredOrders = orders.filter((o) => {
+    const isToday = o.date_commande && new Date(o.date_commande).toDateString() === new Date().toDateString();
+    const matchesDate = dateFilter === 'today' ? isToday : true;
+
     const matchesStatus =
       statusFilter === 'all'
         ? true
@@ -201,7 +205,7 @@ export function MerchantDashboard() {
       (o.telephone && o.telephone.includes(q)) ||
       (o.ville_livraison && o.ville_livraison.toLowerCase().includes(q));
 
-    return matchesStatus && matchesSearch;
+    return matchesDate && matchesStatus && matchesSearch;
   });
 
   return (
@@ -316,7 +320,38 @@ export function MerchantDashboard() {
           </div>
 
           {/* Search & Filter Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3">
+            {/* Toggle Aujourd'hui vs Historique */}
+            <div className="flex items-center gap-1 bg-indigo-50/90 p-1 rounded-xl text-xs font-semibold border border-indigo-100">
+              <button
+                onClick={() => setDateFilter('today')}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  dateFilter === 'today'
+                    ? 'bg-indigo-600 text-white shadow-sm font-bold'
+                    : 'text-indigo-800 hover:text-indigo-950 hover:bg-white/50'
+                }`}
+              >
+                <span>⚡ Aujourd'hui en direct</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${dateFilter === 'today' ? 'bg-white/20 text-white' : 'bg-indigo-200/60 text-indigo-900'}`}>
+                  {orders.filter(o => o.date_commande && new Date(o.date_commande).toDateString() === new Date().toDateString()).length}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setDateFilter('all')}
+                className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 ${
+                  dateFilter === 'all'
+                    ? 'bg-indigo-600 text-white shadow-sm font-bold'
+                    : 'text-indigo-800 hover:text-indigo-950 hover:bg-white/50'
+                }`}
+              >
+                <span>📚 Tout l'historique</span>
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${dateFilter === 'all' ? 'bg-white/20 text-white' : 'bg-indigo-200/60 text-indigo-900'}`}>
+                  {orders.length}
+                </span>
+              </button>
+            </div>
+
             <div className="relative">
               <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -324,7 +359,7 @@ export function MerchantDashboard() {
                 placeholder="Rechercher par N°, client, ville..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-xl w-full sm:w-64 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="pl-9 pr-4 py-1.5 text-xs bg-gray-50 border border-gray-300 rounded-xl w-full sm:w-56 focus:bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
               />
             </div>
 
