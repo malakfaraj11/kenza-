@@ -1,6 +1,6 @@
-# 🛍️ Kenza — L'Agent Commercial WhatsApp Autonome
+# 🛍️ Kenza — L'Agent Commercial WhatsApp Autonome & Plateforme SaaS Vendeurs
 
-> **Kenza** est un agent commercial IA conversationnel conçu pour les e-commerçants marocains. Elle repose sur une architecture **LangGraph multi-agents** avec une base de données PostgreSQL, capable de vendre, conseiller et relancer sur WhatsApp en **Darija**, sans jamais halluciner ses prix ou ses stocks.
+> **Kenza** est une plateforme SaaS e-commerce pour le marché marocain propulsée par un agent commercial IA conversationnel autonome sur **WhatsApp**. Reposant sur une architecture **LangGraph multi-agents**, une base **PostgreSQL** stricte, et le connecteur WhatsApp **Evolution API (Baileys)**, Kenza vend, conseille et relance en **Darija**, français et arabe, sans jamais halluciner ses prix, ses stocks ou ses conditions de vente.
 
 ---
 
@@ -8,101 +8,128 @@
 
 - [Vue d'ensemble](#vue-densemble)
 - [Architecture](#architecture)
+- [Modules de la plateforme SaaS](#modules-de-la-plateforme-saas)
 - [Stack technologique](#stack-technologique)
 - [Structure du projet](#structure-du-projet)
-- [Règles métier](#règles-métier)
+- [Règles métier & Garde-fous](#règles-métier--garde-fous)
 - [Installation et démarrage](#installation-et-démarrage)
+  - [Option A : Lancement rapide via `start.sh` (Recommandé)](#option-a--lancement-rapide-via-startsh-recommandé)
+  - [Option B : Démarrage manuel étape par étape](#option-b--démarrage-manuel-étape-par-étape)
 - [Variables d'environnement](#variables-denvironnement)
-- [Tests E2E](#tests-e2e)
+- [Tests et Évaluation](#tests-et-évaluation)
 - [Principes clés](#principes-clés)
 
 ---
 
 ## Vue d'ensemble
 
-Kenza est une assistante commerciale autonome qui permet à un e-commerçant de gérer automatiquement le flux massif de messages clients sur WhatsApp. Elle permet de :
-- **Qualifier le besoin** et conseiller des produits du catalogue en Darija, Français et Arabe.
-- **Vérifier les stocks** en temps réel et proposer des alternatives en cas de rupture.
-- **Calculer les frais de livraison** en fonction de la ville.
-- **Négocier des remises** dans la limite d'un plancher strict autorisé.
-- **Créer des commandes** directement en base de données sans ressaisie humaine.
-- **Relancer automatiquement** les paniers abandonnés.
-- **Escalader à l'humain** en cas de litige ou de demande complexe (facture entreprise, remboursement).
+Kenza résout le principal goulot d'étranglement des commerçants marocains : la saturation du canal WhatsApp et la perte de ventes hors des horaires d'ouverture. Elle permet de :
+- **Conseiller et vendre en Darija marocaine**, Français et Arabe avec détection automatique de la langue.
+- **Vérifier les stocks en temps réel** et proposer des variantes alternatives disponibles en cas de rupture.
+- **Calculer les frais de livraison officiels** selon la ville marocaine du client.
+- **Respecter les conditions de paiement** (Paiement à la livraison - Cash on Delivery exclusif).
+- **Négocier des remises** dans la limite stricte de 10% maximum autorisée.
+- **Créer des commandes fermes** enregistrées directement dans PostgreSQL.
+- **Relancer les paniers abandonnés** de manière asynchrone via Redis & BullMQ.
+- **Escalader à l'humain** en cas de demande complexe (B2B, litige, annulation) avec interface de résolution commerçant permettant de répondre directement au client.
+- **Ingérer n'importe quel catalogue** (CSV, JSON, archives ZIP) grâce à un parseur dynamique autonome guidé par LLM.
 
 ### Principe fondamental : Zéro-Hallucination
 
-> **Le LLM n'invente JAMAIS un prix ou une quantité.** Les prix, les stocks et les frais de port sont extraits par des appels d'outils stricts reliés à la base de données PostgreSQL. L'agent ne promet jamais de délais de réassort inventés.
+> **Le LLM n'invente JAMAIS un prix, une quantité ou une date.** Tous les prix, stocks et frais de port sont extraits par des outils stricts reliés à PostgreSQL. L'agent ne promet jamais de délais de réassort non enregistrés et ne valide aucune commande sans toutes les informations requises (modèle, taille, ville, adresse).
 
 ---
 
 ## Architecture
 
-L'application est construite autour d'un **graphe d'agents LangGraph** où chaque agent a une responsabilité stricte :
+L'application est architecturée autour d'un **graphe d'agents LangGraph** orchestré par Fastify :
 
 ```text
-                      ┌─────────────┐
-  Message WhatsApp ──▶│   Routing   │ Routage initial (Langue & Contexte)
-                      └──────┬──────┘
-                             │
-                      ┌──────▼──────┐
-                      │Conversation │ Mémoire stateful & multilingue (Darija)
-                      └──────┬──────┘
-                             │
-              ┌──────────────┼──────────────┬──────────────┐
-              │              │              │              │
-       ┌──────▼──────┐ ┌─────▼─────┐ ┌──────▼──────┐ ┌─────▼─────┐
-       │ Extractor / │ │ Calculator│ │ Validator / │ │ Escalade  │
-       │  Catalogue  │ │ (Livraison│ │ Garde-Fou   │ │ (Humain)  │
-       │   & Stock   │ │  & Remise)│ │             │ │           │
-       └──────┬──────┘ └─────┬─────┘ └──────┬──────┘ └─────┬─────┘
-              │              │              │              │
-              └──────────────┼──────────────┘              │
-                             │                             │
-                      ┌──────▼──────┐               ┌──────▼──────┐
-                      │ Commande DB │               │  Dashboard  │
-                      └──────┬──────┘               │ Commerçant  │
-                             │                      └─────────────┘
-                      ┌──────▼──────┐
-                      │   Relance   │ (Asynchrone via BullMQ / Redis)
-                      └─────────────┘
+                       ┌──────────────────────┐
+   Message WhatsApp ──▶│  Fastify / Webhook   │ (Evolution API / Baileys)
+                       └──────────┬───────────┘
+                                  │
+                       ┌──────────▼───────────┐
+                       │  Agent Conversation  │ Mémoire d'échange & Darija
+                       └──────────┬───────────┘
+                                  │
+         ┌────────────────────────┼────────────────────────┬─────────────────────┐
+         │                        │                        │                     │
+  ┌──────▼──────┐          ┌──────▼──────┐          ┌──────▼──────┐       ┌──────▼──────┐
+  │  Catalogue  │          │ Calculateur │          │ Garde-Fou   │       │  Escalade   │
+  │   & Stock   │          │ (Livraison  │          │ (Création   │       │   Humaine   │
+  │ (SQL Strict)│          │  & Remise)  │          │  Commande)  │       │ (Dashboard) │
+  └──────┬──────┘          └──────┬──────┘          └──────┬──────┘       └──────┬──────┘
+         │                        │                        │                     │
+         └────────────────────────┼────────────────────────┘                     │
+                                  │                                              │
+                       ┌──────────▼───────────┐                        ┌─────────▼─────────┐
+                       │   PostgreSQL 16 DB   │◀───────────────────────│  Modale Résolution│
+                       └──────────┬───────────┘                        │    Commerçant     │
+                                  │                                    └───────────────────┘
+                       ┌──────────▼───────────┐
+                       │ Redis 7 + BullMQ     │
+                       │ Surveillance Relance │
+                       └──────────────────────┘
 ```
 
 ### Détail des nœuds et outils
 
 | Agent / Outil | Rôle | Technologie |
-|---------------|------|-------------|
-| **Agent de Conversation** | Maintien du contexte, traduction à la volée (Darija, AR, FR), ton chaleureux. | LLM OpenAI / Graphe State |
-| **Agent Catalogue** | `searchCatalogueTool` : Vérification déterministe des produits et stocks. | SQL (PostgreSQL) + LangChain Tools |
-| **Agent Calculator** | `checkShippingTool` & `calculateDiscountTool` : Application des frais de port et remises. | TypeScript pur |
-| **Agent Garde-Fou** | `createOrderTool` : Vérifie l'intégrité de la commande avant l'insertion en DB. | TypeScript + Validation |
-| **Agent d'Escalade** | `escalateToHumanTool` : Détection du hors-domaine et transfert de contexte. | LLM (Classification) + Base |
-| **Agent de Relance** | Planifie et exécute un message de réengagement de manière autonome. | BullMQ + Redis + Agent IA |
+|---|---|---|
+| **Agent de Conversation** | Maintien du contexte client, ton chaleureux et naturel en Darija marocaine. | LLM (OpenAI gpt-4o-mini / Fallback / Gemini) |
+| **Agent Catalogue** | `searchCatalogueTool` : Consultation stricte des références, tailles et stocks disponibles. | PostgreSQL + SQL Paramétré |
+| **Agent Calculateur** | `checkShippingTool` & `calculateDiscountTool` : Application des frais de port et négociation plafonnée à 10%. | TypeScript pur |
+| **Agent Garde-Fou** | `createOrderTool` : Contrôle d'intégrité avant insertion de commande en base de données. | TypeScript + PostgreSQL |
+| **Agent Escalade** | `escalateToHumanTool` : Détection des demandes hors-scope et transmission du contexte au commerçant. | PostgreSQL (Table `escalades`) |
+| **Worker Relance** | `abandonedCart.ts` : File d'attente asynchrone surveillant l'inactivité client avec relance personnalisée. | BullMQ + Redis + Table `relances_log` |
+
+---
+
+## Modules de la plateforme SaaS
+
+L'interface web propose un espace vendeur complet :
+
+1. **Tableau de bord Vendeur (`MerchantDashboard.tsx`)**
+   - **KPIs temps réel :** Chiffre d'affaires total (MAD), volume de commandes, messages traités, produits en stock et escalades actives.
+   - **Gestion des commandes en direct :** Suivi détaillé des commandes issues de PostgreSQL, modification des statuts (*En préparation*, *Livrée*, *Annulée*) et filtre entre commandes du jour en direct et tout l'historique.
+   - **Centre de résolution des escalades :** Prise en main par le vendeur, saisie d'un message direct envoyé au client sur WhatsApp via l'API et clôture de l'incident.
+
+2. **Mon Stock & Ingestion Fichiers (`CatalogueView.tsx`)**
+   - Consultation et recherche d'articles avec vue des variantes (tailles, couleurs, quantités).
+   - **Ingestion universelle IA (`aiDocParser.ts`) :** Téléversement de fichiers de stock (CSV, Excel, JSON) ou d'archives ZIP. Le modèle extrait, structure et insère automatiquement les articles en base de données avec leurs attributs enrichis (`metadata JSONB`).
+
+3. **WhatsApp IA & Suivi des Relances (`WhatsAppConnectionView.tsx`)**
+   - **Connexion WhatsApp par QR Code :** Appairage instantané de la session WhatsApp de la boutique.
+   - **Configuration de l'agent :** Activation de la Darija, suggestion d'alternatives en cas de rupture.
+   - **Surveillance des paniers abandonnés en direct :** Paramétrage du délai de relance, visualisation des comptes à rebours par client inactif, bouton de déclenchement test immédiat et journal des messages de relance envoyés.
 
 ---
 
 ## Stack technologique
 
-### Frontend (Tableau de bord & Simulateur)
+### Frontend (SaaS Commerçant)
 | Outil | Rôle |
-|-------|------|
-| **React 18** | Interface utilisateur (SPA) |
-| **TypeScript / Vite** | Typage statique et build rapide |
-| **Lucide React** | Icônes du dashboard |
+|---|---|
+| **React 18** | Interface utilisateur SPA réactive |
+| **TypeScript / Vite** | Typage statique et compilation ultra-rapide |
+| **TailwindCSS** | Design moderne, épuré et responsive |
+| **Lucide React** | Pack d'icônes pour l'interface |
 
-### Backend / Agents IA
-### Backend / Agents IA & Evolution API (WhatsApp)
+### Backend / Agents IA & Connecteurs
 | Outil | Rôle |
-|-------|------|
-| **Node.js 20 / Fastify** | Serveur API très haute performance avec ingestion ZIP / Multi-fichiers |
-| **LangGraph / LangChain** | Orchestration du graphe d'agents et outils stricts |
-| **OpenAI API** | Moteur LLM (avec fallback / backup automatique) et parser dynamique |
-| **Evolution API (Baileys)**| Connecteur WhatsApp autonome via QR Code (Mode Baileys / Node.js) |
+|---|---|
+| **Node.js 20 / Fastify** | Serveur API REST haute performance |
+| **LangGraph / LangChain** | Orchestration du graphe d'agents et exécution des outils déterministes |
+| **OpenAI API & Fallback** | Moteur LLM principal (gpt-4o-mini) avec bascule automatique de secours |
+| **Google Gemini API** | Support multi-fournisseurs de modèles de secours |
+| **Evolution API (Baileys)** | Connecteur WhatsApp autonome sans dépendance payante externe |
 
 ### Base de données & Asynchrone
 | Outil | Rôle |
-|-------|------|
-| **PostgreSQL 16** | Base de vérité (Catalogue, Commandes) et `checkpointer` LangGraph |
-| **Redis 7 + BullMQ** | File d'attente pour la gestion des relances asynchrones (Paniers abandonnés) |
+|---|---|
+| **PostgreSQL 16** | Base de vérité relationnelle (Catalogue, Promotions, Commandes, Escalades, Logs) |
+| **Redis 7 + BullMQ** | File d'attente asynchrone pour la planification et l'envoi des relances de paniers |
 
 ---
 
@@ -110,127 +137,196 @@ L'application est construite autour d'un **graphe d'agents LangGraph** où chaqu
 
 ```text
 kenza_app/
-├── client/
+├── client/                                 # Frontend React (SaaS Vendeur)
 │   ├── src/
 │   │   ├── components/
-│   │   │   ├── MerchantDashboard.tsx       # Dashboard commerçant avec Modale de Résolution
-│   │   │   ├── WhatsAppConnectionView.tsx  # Connexion WhatsApp autonome via QR Code
-│   │   │   └── WhatsAppChat.tsx            # Simulateur web WhatsApp
-│   │   └── App.tsx
+│   │   │   ├── MerchantDashboard.tsx       # Dashboard KPIs, Commandes DB et Résolution Escalades
+│   │   │   ├── CatalogueView.tsx           # Consultation du stock et Ingestion IA (CSV/ZIP)
+│   │   │   ├── WhatsAppConnectionView.tsx  # Connexion WhatsApp QR Code & Tracking Relances
+│   │   │   └── WhatsAppChat.tsx            # Simulateur de chat WhatsApp
+│   │   └── App.tsx                         # Authentification Vendeur et Navigation SaaS
 │   └── package.json
-├── server/
+├── server/                                 # Backend API Fastify & Agents
 │   ├── src/
 │   │   ├── agents/
-│   │   │   ├── kenzaAgent.ts               # Graphe LangGraph et Prompt système
-│   │   │   └── tools.ts                    # Outils DB (search, create, calculate, history)
+│   │   │   ├── kenzaAgent.ts               # Graphe LangGraph, logique multi-agents et prompt système
+│   │   │   └── tools.ts                    # Outils déterministes PostgreSQL (search, order, shipping)
 │   │   ├── db/
-│   │   │   ├── connection.ts               # Connexion PostgreSQL
-│   │   │   ├── schema.ts                   # Schémas de DB
-│   │   │   ├── ingest_sujet.ts             # Script d'ingestion dynamique (sujet-02-kenza)
-│   │   │   └── test_evaluation.ts          # Suite de tests d'évaluation 5/5
+│   │   │   ├── connection.ts               # Pool de connexion PostgreSQL
+│   │   │   ├── schema.sql                  # Définitions SQL de l'ensemble des tables
+│   │   │   ├── schema.ts                   # Script d'initialisation du schéma DB
+│   │   │   ├── ingest_sujet.ts             # Script d'ingestion des données officielles du sujet
+│   │   │   └── test_evaluation.ts          # Suite de tests d'évaluation automatisée
 │   │   ├── services/
-│   │   │   └── aiDocParser.ts              # Parser dynamique OpenAI & Extracteur ZIP
+│   │   │   └── aiDocParser.ts              # Parseur IA universel pour fichiers et archives ZIP
 │   │   ├── workers/
-│   │   │   └── abandonedCart.ts            # Worker BullMQ pour les relances avec support JIDs WhatsApp
-│   │   └── index.ts                        # Serveur Fastify, Webhooks Evolution API & API Dashboard
+│   │   │   └── abandonedCart.ts            # Worker BullMQ pour les relances WhatsApp
+│   │   └── index.ts                        # Endpoints API, Webhooks Evolution API & routage
 │   └── package.json
-├── e2e/
-│   └── *.spec.ts                           # Suite de tests Playwright
-├── docker-compose.yml                      # PostgreSQL + Redis + Evolution API
-└── start.sh                                # Script unifié de démarrage
+├── sujet-02-kenza/                         # Données sources du hackathon (catalogue, livraison, clients)
+├── e2e/                                    # Tests de bout en bout (Playwright)
+├── docker-compose.yml                      # Conteneurs PostgreSQL et Redis
+├── start.sh                                # Script unifié de démarrage (Docker + ngrok + dev)
+├── package.json                            # Scripts racine et workspaces npm
+└── README.md
 ```
 
 ---
 
-## Règles métier
+## Règles métier & Garde-fous
 
-### Conditions de Vente & Négociation
-
-| Cas Client | Règle Métier | Comportement de l'Agent |
-|------------|--------------|-------------------------|
-| **Rupture de stock** | Ne jamais promettre un réassort | Annonce poliment la rupture et propose des variantes disponibles extraites de la base. |
-| **Demande de remise** | Plafond strict de **10% maximum** | Négocie jusqu'à 10%. Refuse fermement et transfère à l'humain si le client insiste pour plus. |
-| **Changement d'avis** | Panier modifiable à la volée | Met à jour le panier en mémoire sans obliger le client à tout répéter. |
-| **Hors domaine** | Pas d'improvisation (B2B, litige) | Exécute l'escalade vers l'humain, la discussion remonte sur le Dashboard. |
-| **Panier abandonné** | Inactivité détectée (> 1 minute) | Le Worker BullMQ génère un message de relance subtil et non-intrusif en Darija. |
+| Cas Client | Règle Métier | Comportement de Kenza |
+|---|---|---|
+| **Rupture de stock** | Zéro promesse de réassort inventée | Annonce la rupture avec bienveillance et propose des variantes disponibles extraites de la base. |
+| **Demande de remise** | Plafond strict de **10% maximum** | Négocie jusqu'à 10%. Refuse fermement et escalade à l'humain si le client exige davantage. |
+| **Mode de paiement** | Paiement à la livraison exclusif (COD) | Ne propose aucun moyen de paiement électronique et ne demande jamais de choix de paiement. |
+| **Identité client** | Respect des données réelles | N'invente jamais de prénom, nom ou préfixe non renseigné par le client. |
+| **Hors domaine & B2B** | Pas d'improvisation (factures, litiges) | Exécute l'escalade vers l'humain ; la conversation remonte immédiatement sur le Dashboard avec le contexte. |
+| **Panier abandonné** | Inactivité détectée | Le worker planifie une relance subtile et personnalisée en Darija. |
 
 ---
 
 ## Installation et démarrage
 
 ### Prérequis
-- Docker Desktop (pour PostgreSQL et Redis)
-- Node.js ≥ 20
-- Clé API OpenAI
-- *(Optionnel)* Compte Twilio pour l'intégration WhatsApp
+- **Docker Desktop** (pour PostgreSQL et Redis)
+- **Node.js ≥ 20** et **npm**
+- Clé API OpenAI (ou compatible)
 
-### 1. Démarrer l'infrastructure
+---
+
+### Option A : Lancement rapide via `start.sh` (Recommandé)
+
+Le projet dispose d'un script unifié qui configure et lance toute l'application :
+
+```bash
+chmod +x start.sh
+./start.sh
+```
+
+Ce script effectue automatiquement :
+1. Le démarrage des conteneurs Docker (`PostgreSQL`, `Redis` et `Evolution API`).
+2. Le patch automatique de compatibilité WhatsApp / Baileys multi-devices.
+3. Le lancement du tunnel **ngrok** pour la réception des webhooks WhatsApp.
+4. Le démarrage synchronisé du Backend et du Frontend.
+
+---
+
+### Option B : Démarrage manuel étape par étape
+
+#### 1. Démarrer l'infrastructure Docker
 
 ```bash
 docker compose up -d
 ```
 
-### 2. Installer les dépendances
+#### 2. Installer les dépendances du projet
 
 ```bash
 npm install
 ```
 
-### 3. Variables d'environnement
+#### 3. Configurer les variables d'environnement
 
-Créer un fichier `.env` à la racine (basé sur `.env.example`) :
-
-```env
-DATABASE_URL=postgresql://kenza:kenzapassword@localhost:5432/kenzadb
-PORT=3005
-OPENAI_API_KEY=sk-...
-# Configuration Twilio optionnelle pour le branchement WhatsApp réel
-```
-
-### 4. Peupler la base de données
+Copiez le fichier d'exemple et renseignez vos clés :
 
 ```bash
-npm run seed
+cp .env.example .env
 ```
 
-### 5. Démarrer l'application (Serveur + Simulateur)
+#### 4. Initialiser la base de données et importer les données du sujet
+
+```bash
+# 1. Création des tables PostgreSQL
+npm run db:init --workspace=server
+
+# 2. Ingestion des données officielles (catalogue, clients, livraison, promotions)
+npx tsx server/src/db/ingest_sujet.ts
+```
+
+#### 5. Démarrer le serveur et le dashboard
 
 ```bash
 npm run dev
-# Le simulateur et le Dashboard seront sur http://localhost:5173
+```
+
+L'application sera accessible aux adresses suivantes :
+- **Dashboard SaaS Commerçant :** [http://localhost:5173](http://localhost:5173)
+- **API Backend Fastify :** [http://localhost:3005](http://localhost:3005)
+
+---
+
+## Variables d'environnement
+
+Exemple de configuration dans le fichier `.env` :
+
+```env
+# Base de données PostgreSQL
+DATABASE_URL=postgresql://kenza:kenzapassword@localhost:5432/kenzadb
+POSTGRES_USER=kenza
+POSTGRES_PASSWORD=kenzapassword
+POSTGRES_DB=kenzadb
+
+# Port du serveur API
+PORT=3005
+
+# Configuration LLM Principale
+OPENAI_API_KEY=sk-...
+OPENAI_BASE_URL=https://api.openai.com/v1
+LLM_MODEL=gpt-4o-mini
+
+# Configuration LLM Fallback (Secours Haute Disponibilité)
+OPENAI_API_KEY_BACKUP=sk-...
+OPENAI_BASE_URL_BACKUP=https://api.openai.com/v1
+LLM_MODEL_BACKUP=gpt-4o-mini
+
+# Configuration Alternative Google Gemini (Optionnel)
+GEMINI_API_KEY=AIzaSy...
+
+# Connecteur WhatsApp (Evolution API / Baileys)
+EVOLUTION_API_URL=http://localhost:8080
+EVOLUTION_API_KEY=votre_cle_evolution_api
+EVOLUTION_INSTANCE_NAME=kenza-session
 ```
 
 ---
 
-## Tests E2E (Playwright)
+## Tests et Évaluation
 
-L'application inclut une suite de tests automatisés pour prouver la robustesse des garde-fous.
+### 1. Tests d'évaluation unitaire du cahier des charges
+
+Pour tester directement l'intelligence de l'agent, ses outils et ses garde-fous sur le jeu de données officiel :
+
+```bash
+npx tsx server/src/db/test_evaluation.ts
+```
+
+Scénarios validés par la suite de tests :
+- ✅ **Test 1 :** Recherche exacte de produit en base (*Foulard bordeaux* à 100 DH).
+- ✅ **Test 2 :** Grille des frais de livraison par ville (*Casablanca 25 DH*, *Marrakech 45 DH*).
+- ✅ **Test 3 :** Mémoire client et extraction de l'historique des commandes passées.
+- ✅ **Test 4 :** Négociation et respect du plafond de remise de 10%.
+- ✅ **Test 5 :** Déclenchement automatique de l'escalade vers l'humain pour demande B2B.
+
+### 2. Tests End-to-End (Playwright)
 
 ```bash
 npx playwright test
 ```
 
-| Scénario Testé | Résultat attendu par le Cahier des Charges |
-|----------------|--------------------------------------------|
-| **Guardrails B2B** | L'agent escalade vers l'humain lors d'une demande de facture entreprise. |
-| **Catalogue DB** | L'agent affiche bien les produits réels issus de PostgreSQL. |
-| **Dashboard Metrics** | Les statistiques (CA, conversion) se calculent dynamiquement. |
-| **Stateful Memory** | La conversation garde le contexte (nom, produits) sur 7 messages continus. |
-| **Multilinguisme** | L'agent répond correctement et intelligiblement en Darija. |
-
 ---
 
 ## Principes clés
 
-### Multilinguisme Natif (Darija / Arabe / Français)
-Kenza détecte automatiquement la langue du client. L'exigence de répondre en **Darija marocain** (et non en arabe littéraire classique) est intégrée directement dans les instructions système du graphe, garantissant des échanges naturels.
+### Multilinguisme & Maîtrise de la Darija
+Kenza adapte son langage en temps réel. Elle s'exprime par défaut en **Darija marocaine fluide et naturelle** pour les échanges locaux, tout en étant capable de basculer instantanément en français ou en arabe selon le client.
 
-### Zéro-Hallucination & Transparence
-Le LLM n'a **aucun accès aux chiffres bruts de l'inventaire complet** pour éviter qu'il ne réponde "Il reste 22 unités". Il traduit les données des outils SQL en langage commercial ("Oui, il est disponible en M").
+### Zéro-Hallucination & Transparence Totale
+Le modèle n'a pas accès à un dump textuel complet de la base dans son invite système. Il utilise impérativement les fonctions d'outils PostgreSQL pour interroger les stocks et les prix, garantissant une exactitude à 100%.
 
-### Omnicanal (Web & WhatsApp)
-Le projet peut être utilisé via le simulateur React intégré, ou branché sur les webhooks Twilio pour une intégration 100% réelle sur smartphone en quelques secondes via **ngrok**.
+### Connectivité WhatsApp Réelle & Sans Dépendance Propriétaire
+Grâce à **Evolution API** et la librairie **Baileys**, l'e-commerçant connecte sa boutique à WhatsApp en scannant simplement un QR Code depuis son smartphone, sans abonnement tiers ni contraintes de validation de modèle de messages.
 
 ---
 
-*Projet réalisé pour le Hackathon Numeos 2026 — Kenza, l'agent commercial qui vend vraiment.*
+*Projet réalisé pour le Hackathon Numeos 2026 — Kenza, l'agent commercial autonome qui vend vraiment.*
