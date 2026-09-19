@@ -4,8 +4,16 @@
 
 ---
 
+### 🎥 Démonstration Vidéo & Whitepaper d'Ingénierie
+
+- 🎬 **Démonstration Vidéo (Google Drive) :** [Regarder la démo complète du système](https://drive.google.com/file/d/1VknP6ncci7K_38ITzILt07sgUh1_KEuc/view?usp=sharing)
+- 📄 **Spécification d'Ingénierie & Synthèse d'Impact (PDF) :** [Consulter le Whitepaper (Malak Faraj)](./Kenza%20%E2%80%94%20Rapport%20d%27Ing%C3%A9nierie%20Visuel%20%26%20Sp%C3%A9cification%20Syst%C3%A8me%20%C2%B7%20Malak%20Faraj.pdf)
+
+---
+
 ## 📋 Table des matières
 
+- [Démonstration Vidéo & Whitepaper](#-démonstration-vidéo--whitepaper-dingénierie)
 - [Vue d'ensemble](#vue-densemble)
 - [Architecture](#architecture)
 - [Modules de la plateforme SaaS](#modules-de-la-plateforme-saas)
@@ -167,6 +175,7 @@ kenza_app/
 ├── e2e/                                    # Tests de bout en bout (Playwright)
 ├── docker-compose.yml                      # Conteneurs PostgreSQL et Redis
 ├── start.sh                                # Script unifié de démarrage (Docker + ngrok + dev)
+├── Kenza — Rapport d'Ingénierie Visuel & Spécification Système · Malak Faraj.pdf # Whitepaper d'ingénierie & architecture (PDF)
 ├── package.json                            # Scripts racine et workspaces npm
 └── README.md
 ```
