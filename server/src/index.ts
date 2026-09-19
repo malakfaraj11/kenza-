@@ -209,7 +209,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
 
       const evoData = await evoRes.json().catch(() => ({})) as any;
       if (evoRes.ok) {
-        console.log(`✅ [WhatsApp Envoi Succès] Message délivré à ${cleanTargetPhone}`);
+        console.log(`✅ [WhatsApp Envoi Succès] Message délivré à ${remoteJid}`);
       } else {
         console.error(`❌ [WhatsApp Envoi Échec] Status HTTP ${evoRes.status} de Evolution API:`, JSON.stringify(evoData));
         if (evoData?.response?.message === 'Connection Closed' || evoData?.error === 'Internal Server Error') {

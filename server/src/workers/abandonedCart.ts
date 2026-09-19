@@ -65,7 +65,7 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
 
           const evoData = await evoRes.json().catch(() => ({})) as any;
           if (evoRes.ok) {
-            console.log(`✅ [BullMQ] Relance WhatsApp envoyée avec succès à ${cleanTargetPhone}`);
+            console.log(`✅ [BullMQ] Relance WhatsApp envoyée avec succès à ${targetNumber}`);
           } else {
             console.error(`❌ [BullMQ Erreur WhatsApp] Code HTTP ${evoRes.status} de Evolution API:`, JSON.stringify(evoData));
           }
