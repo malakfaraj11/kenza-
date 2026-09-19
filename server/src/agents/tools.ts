@@ -443,7 +443,7 @@ export const getBoutiqueFaqTool = new DynamicStructuredTool({
   func: async ({ sujet }) => {
     const faq = {
       horaires: "La boutique est ouverte du lundi au samedi, de 10h à 20h. Les messages reçus la nuit sont traités dès le lendemain matin.",
-      paiement: "Nous acceptons le paiement à la livraison (selon la ville), le virement bancaire, et la carte bancaire via lien de paiement sécurisé.",
+      paiement: "Le seul et unique moyen de paiement accepté est le paiement à la livraison (en espèces lors de la réception du colis). Aucun paiement en ligne ni virement n'est proposé.",
       retrait_boutique: "Le retrait en boutique sous 24h est possible uniquement dans nos boutiques de Casablanca et de Fès.",
       garantie: "Les défauts de fabrication sont garantis et pris en charge sous 30 jours sur présentation du ticket ou confirmation de commande.",
       international: "Nous ne livrons pas à l'international. Les livraisons se font exclusivement au Maroc dans les villes desservies."
