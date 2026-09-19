@@ -13,3 +13,8 @@ build/
 # Logs & Système
 *.log
 .DS_Store
+
+# Playwright Test Artifacts
+test-results/
+playwright-report/
+
