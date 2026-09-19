@@ -47,7 +47,7 @@ export function setupAbandonedCartWorker(conversationHistories: Map<string, any[
 
       if (apiUrl && apiKey && instanceName) {
         try {
-          const cleanTargetPhone = phone.includes('@') ? phone : phone.replace(/[^0-9]/g, '');
+          const cleanTargetPhone = phone.replace(/@.*$/, '').replace(/[^0-9]/g, '');
           const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
           
           const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {

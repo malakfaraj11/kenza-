@@ -195,8 +195,9 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
     const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'kenza-bot';
 
     if (apiUrl && apiKey && instanceName) {
+      const cleanTargetPhone = remoteJid.replace(/@.*$/, '').replace(/[^0-9]/g, '');
       const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
-      console.log(`📤 [WhatsApp Envoi] Envoi de la réponse à ${remoteJid}: "${messageText}"`);
+      console.log(`📤 [WhatsApp Envoi] Envoi de la réponse à ${cleanTargetPhone} (${remoteJid}): "${messageText}"`);
 
       const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
@@ -205,7 +206,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          number: remoteJid,
+          number: cleanTargetPhone,
           options: { delay: 1200, presence: 'composing' },
           textMessage: { text: messageText }
         })
@@ -213,7 +214,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
 
       const evoData = await evoRes.json().catch(() => ({})) as any;
       if (evoRes.ok) {
-        console.log(`✅ [WhatsApp Envoi Succès] Message délivré à ${remoteJid}`);
+        console.log(`✅ [WhatsApp Envoi Succès] Message délivré à ${cleanTargetPhone}`);
       } else {
         console.error(`❌ [WhatsApp Envoi Échec] Status HTTP ${evoRes.status} de Evolution API:`, JSON.stringify(evoData));
         if (evoData?.response?.message === 'Connection Closed' || evoData?.error === 'Internal Server Error') {
@@ -402,6 +403,8 @@ fastify.get('/api/catalogue', async () => {
   return res.rows;
 });
 
+let activeQrCodeCache: { base64: string | null; fetchedAt: number } = { base64: null, fetchedAt: 0 };
+
 /**
  * 8. API WhatsApp Status (Evolution API / QR Code)
  */
@@ -418,10 +421,17 @@ fastify.get('/api/whatsapp/status', async () => {
       const data = await res.json() as any;
       const state = data?.instance?.state || 'disconnected';
       if (state === 'open') {
+        activeQrCodeCache = { base64: null, fetchedAt: 0 };
         return { status: 'connected', qrCode: null };
       }
 
-      // If connecting, automatically retrieve active base64 QR code
+      // Eviter d'appeler /instance/connect à chaque poll de 3 secondes si un QR Code récent existe (< 35 sec)
+      const now = Date.now();
+      if (activeQrCodeCache.base64 && (now - activeQrCodeCache.fetchedAt < 35000)) {
+        return { status: 'pending', qrCode: activeQrCodeCache.base64 };
+      }
+
+      // If connecting/disconnected and no recent QR code cached, retrieve active base64 QR code
       const connectRes = await fetch(`${apiUrl}/instance/connect/${instanceName}`, {
         headers: { 'apikey': apiKey }
       });
@@ -431,10 +441,11 @@ fastify.get('/api/whatsapp/status', async () => {
         if (rawBase64 && typeof rawBase64 === 'string' && !rawBase64.startsWith('data:image')) {
           rawBase64 = `data:image/png;base64,${rawBase64}`;
         }
+        activeQrCodeCache = { base64: rawBase64, fetchedAt: now };
         return { status: 'pending', qrCode: rawBase64 };
       }
 
-      return { status: state === 'connecting' ? 'pending' : 'disconnected', qrCode: null };
+      return { status: state === 'connecting' ? 'pending' : 'disconnected', qrCode: activeQrCodeCache.base64 };
     }
   } catch (e) {}
 
@@ -459,6 +470,7 @@ fastify.post('/api/whatsapp/connect', async () => {
       if (rawBase64 && !rawBase64.startsWith('data:image')) {
         rawBase64 = `data:image/png;base64,${rawBase64}`;
       }
+      activeQrCodeCache = { base64: rawBase64, fetchedAt: Date.now() };
       return { status: 'pending', qrCode: rawBase64 };
     }
   } catch (e) {}
@@ -473,6 +485,7 @@ fastify.post('/api/whatsapp/connect', async () => {
  * 10. API WhatsApp Disconnect
  */
 fastify.post('/api/whatsapp/disconnect', async () => {
+  activeQrCodeCache = { base64: null, fetchedAt: 0 };
   const apiUrl = process.env.EVOLUTION_API_URL;
   const apiKey = process.env.EVOLUTION_API_KEY;
   const instanceName = process.env.EVOLUTION_INSTANCE_NAME || 'kenza-bot';
