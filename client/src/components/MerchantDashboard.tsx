@@ -245,15 +245,15 @@ export function MerchantDashboard() {
 
       {/* MODAL DE RÉSOLUTION D'ESCALADE & DE COMPLÉTION DES INFOS */}
       {selectedEscalade && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-gray-900/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-2xl w-full max-w-2xl overflow-hidden max-h-[92vh] flex flex-col">
             {/* Modal Header */}
-            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-5 text-white flex justify-between items-center">
+            <div className="bg-gradient-to-r from-indigo-900 to-indigo-700 p-4 sm:p-5 text-white flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                  <Eye className="w-5 h-5 text-emerald-400" /> Ticket #{selectedEscalade.id} - Compléter les Infos Client
+                <h3 className="font-bold text-sm sm:text-lg flex items-center gap-2">
+                  <Eye className="w-5 h-5 text-emerald-400 flex-shrink-0" /> Ticket #{selectedEscalade.id} - Compléter les Infos Client
                 </h3>
-                <p className="text-xs text-indigo-200">Validation de la commande et envoi de confirmation par l'Agent IA</p>
+                <p className="text-[11px] sm:text-xs text-indigo-200">Validation de la commande et envoi de confirmation par l'Agent IA</p>
               </div>
               <button
                 onClick={() => setSelectedEscalade(null)}
@@ -264,14 +264,14 @@ export function MerchantDashboard() {
             </div>
 
             {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
+            <div className="p-4 sm:p-6 overflow-y-auto space-y-5 flex-1 text-xs sm:text-sm">
               {/* Context Card */}
-              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="bg-amber-50/80 border border-amber-200 rounded-xl p-3.5 sm:p-4 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                   <span className="font-bold text-amber-900 text-xs flex items-center gap-1.5">
-                    <Phone className="w-4 h-4 text-amber-600" /> Téléphone : {selectedEscalade.telephone}
+                    <Phone className="w-4 h-4 text-amber-600 flex-shrink-0" /> Téléphone : {selectedEscalade.telephone}
                   </span>
-                  <span className="px-2 py-0.5 bg-amber-200/60 text-amber-800 rounded font-semibold text-[11px]">
+                  <span className="px-2 py-0.5 bg-amber-200/60 text-amber-800 rounded font-semibold text-[11px] self-start sm:self-auto">
                     Motif : {selectedEscalade.raison}
                   </span>
                 </div>
@@ -282,24 +282,24 @@ export function MerchantDashboard() {
 
               {/* Resolution Form */}
               <form onSubmit={handleResolveEscalade} className="space-y-4">
-                <h4 className="font-bold text-gray-900 text-sm border-b pb-2 flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-indigo-600" /> Compléter les informations de livraison manquantes :
+                <h4 className="font-bold text-gray-900 text-xs sm:text-sm border-b pb-2 flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-indigo-600 flex-shrink-0" /> Compléter les informations de livraison manquantes :
                 </h4>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block font-bold text-gray-700 mb-1 text-xs">Frais de livraison (MAD) *</label>
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap sm:flex-nowrap gap-1.5 sm:gap-2">
                       <input
                         type="number"
                         min="0"
                         value={fraisLivraison}
                         onChange={(e) => setFraisLivraison(Number(e.target.value))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        className="w-full sm:w-28 px-3 py-2 border border-gray-300 rounded-lg font-bold text-gray-900 focus:ring-2 focus:ring-indigo-500 outline-none"
                       />
-                      <button type="button" onClick={() => setFraisLivraison(25)} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs">25 DH</button>
-                      <button type="button" onClick={() => setFraisLivraison(35)} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs">35 DH</button>
-                      <button type="button" onClick={() => setFraisLivraison(50)} className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs">50 DH</button>
+                      <button type="button" onClick={() => setFraisLivraison(25)} className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold">25 DH</button>
+                      <button type="button" onClick={() => setFraisLivraison(35)} className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold">35 DH</button>
+                      <button type="button" onClick={() => setFraisLivraison(50)} className="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded text-xs font-semibold">50 DH</button>
                     </div>
                   </div>
 

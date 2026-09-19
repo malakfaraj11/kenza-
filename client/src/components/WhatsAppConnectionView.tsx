@@ -120,12 +120,12 @@ export function WhatsAppConnectionView() {
           </p>
         </div>
 
-        <div className="p-8">
+        <div className="p-4 sm:p-8">
           {waStatus === 'disconnected' && (
-            <div className="text-center py-6">
-              <div className="bg-blue-50 border border-blue-100 text-blue-900 rounded-xl p-5 mb-8 text-sm text-left max-w-xl mx-auto">
+            <div className="text-center py-4 sm:py-6">
+              <div className="bg-blue-50 border border-blue-100 text-blue-900 rounded-xl p-4 sm:p-5 mb-6 sm:mb-8 text-xs sm:text-sm text-left max-w-xl mx-auto">
                 <h4 className="font-bold flex items-center gap-2 text-blue-900 mb-2">
-                  <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                  <ShieldCheck className="w-5 h-5 text-indigo-600 flex-shrink-0" />
                   Procédure de liaison sécurisée (Mode Baileys / Evolution API)
                 </h4>
                 <ol className="list-decimal ml-5 space-y-1.5 text-blue-800 text-xs sm:text-sm">
@@ -139,7 +139,7 @@ export function WhatsAppConnectionView() {
               <button
                 onClick={handleGenerateQR}
                 disabled={loading}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-8 rounded-xl transition shadow-lg shadow-indigo-600/30 inline-flex items-center gap-2"
+                className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 sm:px-8 rounded-xl transition shadow-lg shadow-indigo-600/30 inline-flex items-center justify-center gap-2 text-xs sm:text-sm"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <QrCode className="w-5 h-5" />}
                 Générer le QR Code de Connexion
@@ -148,15 +148,15 @@ export function WhatsAppConnectionView() {
           )}
 
           {waStatus === 'pending' && (
-            <div className="flex flex-col items-center py-4">
-              <p className="font-semibold text-gray-900 text-base mb-2">Scannez ce QR Code avec WhatsApp</p>
-              <p className="text-xs text-gray-500 mb-6">Valable 60 secondes pour établir la session autonome</p>
+            <div className="flex flex-col items-center py-2 sm:py-4">
+              <p className="font-semibold text-gray-900 text-sm sm:text-base mb-1 text-center">Scannez ce QR Code avec WhatsApp</p>
+              <p className="text-xs text-gray-500 mb-4 sm:mb-6 text-center">Valable 60 secondes pour établir la session autonome</p>
 
-              <div className="p-4 border-2 border-indigo-100 rounded-2xl bg-white shadow-md mb-6 relative group">
+              <div className="p-3 sm:p-4 border-2 border-indigo-100 rounded-2xl bg-white shadow-md mb-4 sm:mb-6 relative group max-w-full">
                 {qrCodeUrl ? (
-                  <img src={qrCodeUrl} alt="QR Code WhatsApp" className="w-64 h-64 object-contain rounded-lg" />
+                  <img src={qrCodeUrl} alt="QR Code WhatsApp" className="w-52 h-52 sm:w-64 sm:h-64 object-contain rounded-lg mx-auto" />
                 ) : (
-                  <div className="w-64 h-64 flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
+                  <div className="w-52 h-52 sm:w-64 sm:h-64 flex items-center justify-center text-gray-400 bg-gray-50 rounded-lg">
                     <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
                   </div>
                 )}
@@ -166,20 +166,20 @@ export function WhatsAppConnectionView() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 mb-8 bg-indigo-50 px-4 py-2 rounded-full">
-                <Loader2 className="w-4 h-4 animate-spin" /> En attente de détection du scan mobile...
+              <div className="flex items-center gap-2 text-xs font-medium text-indigo-600 mb-6 bg-indigo-50 px-3 sm:px-4 py-2 rounded-full text-center">
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" /> En attente de détection du scan mobile...
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full sm:w-auto">
                 <button
                   onClick={() => setWaStatus('disconnected')}
-                  className="px-5 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition"
+                  className="w-full sm:w-auto px-5 py-2 border border-gray-300 text-gray-700 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-50 transition"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={simulateScanSuccess}
-                  className="px-5 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 transition text-xs"
+                  className="w-full sm:w-auto px-5 py-2 bg-gray-900 text-white font-medium rounded-lg hover:bg-gray-800 transition text-xs"
                 >
                   (Simulation : Valider le Scan)
                 </button>
@@ -189,18 +189,18 @@ export function WhatsAppConnectionView() {
 
           {waStatus === 'connected' && (
             <div className="text-center py-4">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
-                <CheckCircle2 className="w-10 h-10" />
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4 border-4 border-emerald-50">
+                <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10" />
               </div>
 
-              <h3 className="text-xl font-bold text-gray-900 mb-1">Agent IA Connecté &amp; En Ligne</h3>
-              <p className="text-sm text-gray-500 mb-8">
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-1">Agent IA Connecté &amp; En Ligne</h3>
+              <p className="text-xs sm:text-sm text-gray-500 mb-6 sm:mb-8 max-w-md mx-auto">
                 L'Agent IA Kenza répond désormais à vos clients sur WhatsApp en consultant automatiquement votre stock.
               </p>
 
               {/* Agent Configuration Settings */}
-              <div className="bg-gray-50 rounded-xl p-6 text-left border border-gray-200 mb-8 max-w-xl mx-auto">
-                <h4 className="font-bold text-sm text-gray-900 border-b border-gray-200 pb-3 mb-4">
+              <div className="bg-gray-50 rounded-xl p-4 sm:p-6 text-left border border-gray-200 mb-6 sm:mb-8 max-w-xl mx-auto">
+                <h4 className="font-bold text-xs sm:text-sm text-gray-900 border-b border-gray-200 pb-3 mb-4">
                   Règles &amp; Comportement de l'Agent IA
                 </h4>
                 <div className="space-y-4">
@@ -209,11 +209,11 @@ export function WhatsAppConnectionView() {
                       type="checkbox"
                       checked={proposeAlternatives}
                       onChange={(e) => setProposeAlternatives(e.target.checked)}
-                      className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 flex-shrink-0"
                     />
                     <div>
-                      <span className="text-sm font-medium text-gray-900">Proposer des alternatives si stock épuisé</span>
-                      <p className="text-xs text-gray-500">Si une couleur/taille manque, l'IA suggère d'autres variantes existantes.</p>
+                      <span className="text-xs sm:text-sm font-medium text-gray-900">Proposer des alternatives si stock épuisé</span>
+                      <p className="text-[11px] sm:text-xs text-gray-500">Si une couleur/taille manque, l'IA suggère d'autres variantes existantes.</p>
                     </div>
                   </label>
 
@@ -222,26 +222,26 @@ export function WhatsAppConnectionView() {
                       type="checkbox"
                       checked={enableDarija}
                       onChange={(e) => setEnableDarija(e.target.checked)}
-                      className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                      className="mt-1 w-4 h-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500 flex-shrink-0"
                     />
                     <div>
-                      <span className="text-sm font-medium text-gray-900">Activer le support Darija / Français mixte</span>
-                      <p className="text-xs text-gray-500">L'IA s'adapte à la langue du client (Lettres latines / Arabizi / FR / AR).</p>
+                      <span className="text-xs sm:text-sm font-medium text-gray-900">Activer le support Darija / Français mixte</span>
+                      <p className="text-[11px] sm:text-xs text-gray-500">L'IA s'adapte à la langue du client (Lettres latines / Arabizi / FR / AR).</p>
                     </div>
                   </label>
                 </div>
               </div>
 
-              <div className="flex justify-center gap-4">
+              <div className="flex flex-col sm:flex-row justify-center gap-3">
                 <button
                   onClick={handleGenerateQR}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
+                  className="w-full sm:w-auto px-4 py-2 border border-gray-300 text-gray-700 text-xs sm:text-sm font-medium rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" /> Regénérer la session
                 </button>
                 <button
                   onClick={handleDisconnect}
-                  className="px-5 py-2 bg-red-50 border border-red-200 text-red-600 text-sm font-medium rounded-lg hover:bg-red-100 transition flex items-center gap-2"
+                  className="w-full sm:w-auto px-5 py-2 bg-red-50 border border-red-200 text-red-600 text-xs sm:text-sm font-medium rounded-lg hover:bg-red-100 transition flex items-center justify-center gap-2"
                 >
                   <Power className="w-4 h-4" /> Déconnecter le numéro
                 </button>
