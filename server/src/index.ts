@@ -191,7 +191,7 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
       const messageText = typeof response.reply === 'string' ? response.reply : String(response.reply || '');
       console.log(`📤 [WhatsApp Envoi] Envoi de la réponse à ${remoteJid}: "${messageText}"`);
 
-      await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
+      const evoRes = await fetch(`${apiUrl}/message/sendText/${instanceName}`, {
         method: 'POST',
         headers: {
           'apikey': apiKey,
@@ -203,6 +203,16 @@ fastify.post('/api/webhooks/evolution/whatsapp', async (request, reply) => {
           textMessage: { text: messageText }
         })
       });
+
+      const evoData = await evoRes.json().catch(() => ({})) as any;
+      if (evoRes.ok) {
+        console.log(`✅ [WhatsApp Envoi Succès] Message délivré à ${remoteJid}`);
+      } else {
+        console.error(`❌ [WhatsApp Envoi Échec] Status HTTP ${evoRes.status} de Evolution API:`, JSON.stringify(evoData));
+        if (evoData?.response?.message === 'Connection Closed' || evoData?.error === 'Internal Server Error') {
+          console.error(`⚠️ [WhatsApp Action Requise] La session WhatsApp '${instanceName}' est déconnectée (Connection Closed). Veuillez ré-ouvrir le Dashboard et scanner le QR Code !`);
+        }
+      }
     }
   } catch (err: any) {
     fastify.log.error(err);
